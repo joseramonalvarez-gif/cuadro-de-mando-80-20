@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 207 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 207 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 207 30% 15%;
+    --primary: 174 51% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 180 14% 75%;
+    --secondary-foreground: 207 30% 15%;
+    --muted: 36 100% 97%;
+    --muted-foreground: 210 12% 30%;
+    --accent: 174 51% 42%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 69% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 180 14% 90%;
+    --input: 180 14% 75%;
+    --ring: 174 51% 42%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #B7CAC9;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3E4C59;
+}
+
+/* Space Grotesk for headings and KPIs */
+.font-display,
+h1, h2, h3, h4 {
+  font-family: 'Space Grotesk', sans-serif;
+}
