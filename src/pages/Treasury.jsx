@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import ModulePage from '../components/shared/ModulePage';
-import TesoreríaChart from '../components/home/TesoreríaChart';
+import TresoreryChart from '../components/home/TresoreryChart';
 import DataTable from '../components/shared/DataTable';
 import { formatCurrency, generateDemoData } from '../components/shared/DemoData';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Eye } from 'lucide-react';
@@ -43,7 +43,7 @@ export default function Treasury() {
       {() => (
         <>
           <div className="mb-6">
-            <TesoreríaChart data={demoData.previsionTesoreria} />
+            <TresoreryChart data={demoData.previsionTesoreria} />
           </div>
           <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk'] mb-3">Últimos Movimientos</h3>
           <DataTable columns={COLUMNS} data={DEMO_MOVEMENTS} />

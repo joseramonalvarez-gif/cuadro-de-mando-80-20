@@ -7,7 +7,7 @@ import LoadingState from '../components/shared/LoadingState';
 import KpiGrid from '../components/home/KpiGrid';
 import VentasComprasChart from '../components/home/VentasComprasChart';
 import ConcentracionChart from '../components/home/ConcentracionChart';
-import TesoreríaChart from '../components/home/TesoreríaChart';
+import TresoreryChart from '../components/home/TresoreryChart';
 import TopClientesChart from '../components/home/TopClientesChart';
 
 export default function Home() {
@@ -44,7 +44,7 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        <TesoreríaChart data={data.previsionTesoreria} />
+        <TresoreryChart data={data.previsionTesoreria} />
         <TopClientesChart data={data.topClientes} />
       </div>
     </div>
