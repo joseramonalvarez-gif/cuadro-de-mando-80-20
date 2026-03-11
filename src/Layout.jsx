@@ -18,6 +18,7 @@ const PAGE_TITLES = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <AppProvider>
@@ -27,13 +28,25 @@ export default function Layout({ children, currentPageName }) {
         .font-display { font-family: 'Space Grotesk', sans-serif; }
       `}</style>
       <div className="min-h-screen bg-[#FFFAF3]">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-        <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-[68px]' : 'ml-[260px]'}`}>
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div className="fixed inset-0 bg-black/40 z-20 lg:hidden" onClick={() => setMobileOpen(false)} />
+        )}
+        <div className={`lg:block ${mobileOpen ? 'block' : 'hidden lg:block'}`}>
+          <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+        </div>
+        <div className={`transition-all duration-300 lg:${sidebarCollapsed ? 'ml-[68px]' : 'ml-[260px]'}`} style={{ marginLeft: typeof window !== 'undefined' && window.innerWidth >= 1024 ? (sidebarCollapsed ? 68 : 260) : 0 }}>
           <TopBar
             title={PAGE_TITLES[currentPageName] || currentPageName}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onToggleSidebar={() => {
+              if (window.innerWidth < 1024) {
+                setMobileOpen(!mobileOpen);
+              } else {
+                setSidebarCollapsed(!sidebarCollapsed);
+              }
+            }}
           />
-          <main className="p-6">
+          <main className="p-4 md:p-6">
             {children}
           </main>
         </div>
