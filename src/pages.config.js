@@ -54,6 +54,9 @@ import Treasury from './pages/Treasury';
 import Taxes from './pages/Taxes';
 import HumanResources from './pages/HumanResources';
 import Products from './pages/Products';
+import Alerts from './pages/Alerts';
+import Chat from './pages/Chat';
+import Settings from './pages/Settings';
 import __Layout from './Layout.jsx';
 
 
@@ -65,6 +68,9 @@ export const PAGES = {
     "Taxes": Taxes,
     "HumanResources": HumanResources,
     "Products": Products,
+    "Alerts": Alerts,
+    "Chat": Chat,
+    "Settings": Settings,
 }
 
 export const pagesConfig = {
