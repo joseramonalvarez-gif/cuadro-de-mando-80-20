@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider } from './components/shared/DemoContext';
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
@@ -19,6 +19,14 @@ const PAGE_TITLES = {
 export default function Layout({ children, currentPageName }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   return (
     <AppProvider>
@@ -29,20 +37,27 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
       <div className="min-h-screen bg-[#FFFAF3]">
         {/* Mobile overlay */}
-        {mobileOpen && (
-          <div className="fixed inset-0 bg-black/40 z-20 lg:hidden" onClick={() => setMobileOpen(false)} />
+        {mobileOpen && !isDesktop && (
+          <div className="fixed inset-0 bg-black/40 z-20" onClick={() => setMobileOpen(false)} />
         )}
-        <div className={`lg:block ${mobileOpen ? 'block' : 'hidden lg:block'}`}>
+        
+        {/* Sidebar - always visible on desktop, toggle on mobile */}
+        <div className={isDesktop ? 'block' : (mobileOpen ? 'block' : 'hidden')}>
           <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         </div>
-        <div className={`transition-all duration-300 lg:${sidebarCollapsed ? 'ml-[68px]' : 'ml-[260px]'}`} style={{ marginLeft: typeof window !== 'undefined' && window.innerWidth >= 1024 ? (sidebarCollapsed ? 68 : 260) : 0 }}>
+        
+        {/* Main content */}
+        <div
+          className="transition-all duration-300"
+          style={{ marginLeft: isDesktop ? (sidebarCollapsed ? 68 : 260) : 0 }}
+        >
           <TopBar
             title={PAGE_TITLES[currentPageName] || currentPageName}
             onToggleSidebar={() => {
-              if (window.innerWidth < 1024) {
-                setMobileOpen(!mobileOpen);
-              } else {
+              if (isDesktop) {
                 setSidebarCollapsed(!sidebarCollapsed);
+              } else {
+                setMobileOpen(!mobileOpen);
               }
             }}
           />
