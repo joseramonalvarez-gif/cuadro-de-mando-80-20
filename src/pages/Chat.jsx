@@ -7,13 +7,15 @@ import { Send, Bot, User, Sparkles, Loader2 } from 'lucide-react';
 import LoadingState from '../components/shared/LoadingState';
 import ReactMarkdown from 'react-markdown';
 
-const SUGGESTED_QUESTIONS = [
-  '¿Cuáles son mis 5 clientes más rentables?',
-  '¿Cómo ha evolucionado mi margen bruto este trimestre?',
-  '¿Tengo facturas vencidas sin cobrar?',
-  '¿Cuál es mi previsión de tesorería para los próximos 30 días?',
-  '¿Qué proveedores concentran más del 15% de mis compras?',
-  '¿Cuál es el DSO actual y cómo se compara con el trimestre anterior?',
+const FAQ_QUESTIONS = [
+  '¿Cuáles son los 5 clientes que más facturación generan este mes?',
+  '¿Cuál es mi margen bruto actual?',
+  '¿Tengo facturas pendientes de cobro con más de 90 días?',
+  '¿Qué producto se vende más este trimestre?',
+  '¿Cuál es mi previsión de caja para los próximos 30 días?',
+  '¿Qué proveedor concentra más mis compras?',
+  '¿Hay alguna alerta activa que deba atender?',
+  '¿Cuál es mi DSO actual y cómo está respecto al mes anterior?',
 ];
 
 export default function Chat() {
@@ -31,22 +33,34 @@ export default function Chat() {
 
   async function sendMessage(text) {
     if (!text.trim()) return;
+    
     const userMsg = { role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsThinking(true);
 
-    const systemPrompt = `Eres un asistente financiero experto para la empresa "${activeCompany?.name || 'Demo'}". 
-Responde en español. Sé conciso y usa datos numéricos cuando sea posible. 
-Formato: usa markdown para estructurar respuestas.
-Si no tienes datos reales, proporciona análisis basados en los datos de ejemplo disponibles.
-${isNormalUser ? 'Da respuestas simplificadas y accesibles.' : 'Da respuestas detalladas con análisis profundo.'}`;
+    try {
+      const response = await base44.functions.invoke('chatIntelligente', {
+        question: text,
+        companyId: activeCompany.id,
+      });
 
-    const response = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nPregunta del usuario: ${text}`,
-    });
+      if (response.data?.answer) {
+        setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
+      } else {
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: 'Lo siento, ha ocurrido un error al procesar tu pregunta. Por favor, inténtalo de nuevo.' 
+        }]);
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Lo siento, no he podido procesar tu pregunta en este momento. Por favor, verifica que la API Key de Claude esté configurada correctamente.' 
+      }]);
+    }
 
-    setMessages(prev => [...prev, { role: 'assistant', content: response }]);
     setIsThinking(false);
   }
 
@@ -72,9 +86,9 @@ ${isNormalUser ? 'Da respuestas simplificadas y accesibles.' : 'Da respuestas de
               <Bot className="w-10 h-10 text-[#B7CAC9] mx-auto mb-3" />
               <p className="text-sm text-[#3E4C59] mb-6">¿En qué puedo ayudarte hoy?</p>
               
-              {/* Suggested questions */}
+              {/* FAQ Questions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-[600px] mx-auto">
-                {(isNormalUser ? SUGGESTED_QUESTIONS.slice(0, 4) : SUGGESTED_QUESTIONS).map((q, i) => (
+                {FAQ_QUESTIONS.map((q, i) => (
                   <button
                     key={i}
                     onClick={() => sendMessage(q)}
@@ -132,6 +146,18 @@ ${isNormalUser ? 'Da respuestas simplificadas y accesibles.' : 'Da respuestas de
 
         {/* Input area */}
         <div className="border-t border-[#E8EEEE] p-4">
+          {messages.length > 0 && (
+            <div className="mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMessages([])}
+                className="text-xs text-[#3E4C59] hover:text-[#33A19A]"
+              >
+                Nueva conversación
+              </Button>
+            </div>
+          )}
           <form
             onSubmit={(e) => { e.preventDefault(); sendMessage(input); }}
             className="flex gap-2"
@@ -139,9 +165,9 @@ ${isNormalUser ? 'Da respuestas simplificadas y accesibles.' : 'Da respuestas de
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isNormalUser ? 'Selecciona una pregunta sugerida o escribe aquí...' : 'Escribe tu pregunta...'}
+              placeholder={isNormalUser ? 'Selecciona una pregunta FAQ...' : 'Escribe tu pregunta sobre los datos de tu empresa...'}
               className="flex-1 border-[#B7CAC9] focus:border-[#33A19A]"
-              disabled={isThinking}
+              disabled={isThinking || (isNormalUser && !input.trim())}
             />
             <Button
               type="submit"
@@ -151,6 +177,11 @@ ${isNormalUser ? 'Da respuestas simplificadas y accesibles.' : 'Da respuestas de
               <Send className="w-4 h-4" />
             </Button>
           </form>
+          {isNormalUser && (
+            <p className="text-xs text-[#B7CAC9] mt-2">
+              Usuario Normal: Solo puedes usar las preguntas predefinidas arriba
+            </p>
+          )}
         </div>
       </div>
     </div>
