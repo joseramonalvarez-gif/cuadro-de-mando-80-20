@@ -7,7 +7,7 @@ import LoadingState from '../components/shared/LoadingState';
 import KpiGrid from '../components/home/KpiGrid';
 import VentasComprasChart from '../components/home/VentasComprasChart';
 import ConcentracionChart from '../components/home/ConcentracionChart';
-import TresoreryChart from '../components/home/TresoreryChart';
+import TresoreryChart from '../components/home/TresoreryChart.jsx';
 import TopClientesChart from '../components/home/TopClientesChart';
 
 export default function Home() {
