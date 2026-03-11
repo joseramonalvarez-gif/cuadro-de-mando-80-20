@@ -1,146 +1,352 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../components/shared/DemoContext';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import LoadingState from '../components/shared/LoadingState';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import DemoBanner from '../components/shared/DemoBanner';
+import AlertFilters from '../components/alerts/AlertFilters';
+import AlertFormModal from '../components/alerts/AlertFormModal';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Pencil, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatCurrency } from '../components/shared/DemoData';
 
-const KPI_OPTIONS = [
-  { value: 'ventas_netas', label: 'Ventas Netas' },
-  { value: 'margen_bruto', label: 'Margen Bruto (%)' },
-  { value: 'ebitda', label: 'EBITDA (%)' },
-  { value: 'caja_actual', label: 'Caja Actual' },
-  { value: 'dso', label: 'DSO (Días Cobro)' },
-  { value: 'morosidad_90', label: 'Morosidad +90d' },
-  { value: 'dpo', label: 'DPO (Días Pago)' },
-  { value: 'opex_ventas', label: 'OPEX % sobre Ventas' },
+const SYSTEM_ALERTS = [
+  { kpi_name: 'dso', kpi_label: 'DSO', module: 'ventas', condition: 'greater_than', threshold: 60, severity: 'yellow', period: 'daily' },
+  { kpi_name: 'dso', kpi_label: 'DSO', module: 'ventas', condition: 'greater_than', threshold: 90, severity: 'red', period: 'daily' },
+  { kpi_name: 'morosidad_90', kpi_label: 'Morosidad +90d', module: 'tesoreria', condition: 'greater_than', threshold: 5, severity: 'red', period: 'daily' },
+  { kpi_name: 'saldo_caja', kpi_label: 'Saldo Caja', module: 'tesoreria', condition: 'less_than', threshold: 30000, severity: 'yellow', period: 'daily' },
+  { kpi_name: 'saldo_caja', kpi_label: 'Saldo Caja', module: 'tesoreria', condition: 'less_than', threshold: 10000, severity: 'red', period: 'daily' },
+  { kpi_name: 'concentracion_proveedor', kpi_label: 'Proveedor > 30%', module: 'compras', condition: 'greater_than', threshold: 30, severity: 'yellow', period: 'monthly' },
+  { kpi_name: 'margen_bruto', kpi_label: 'Margen Bruto', module: 'ventas', condition: 'less_than', threshold: 25, severity: 'yellow', period: 'monthly' },
+  { kpi_name: 'ruptura_stock', kpi_label: 'Ruptura Stock Clase A', module: 'producto', condition: 'greater_than', threshold: 0, severity: 'red', period: 'daily' },
+  { kpi_name: 'vencimiento_fiscal', kpi_label: 'Vencimiento Fiscal 15d', module: 'fiscalidad', condition: 'less_than', threshold: 15, severity: 'yellow', period: 'daily' },
+  { kpi_name: 'vencimiento_fiscal', kpi_label: 'Vencimiento Fiscal 5d', module: 'fiscalidad', condition: 'less_than', threshold: 5, severity: 'red', period: 'daily' },
 ];
 
-const SEVERITY_COLORS = {
-  green: 'bg-emerald-100 text-emerald-700',
-  yellow: 'bg-amber-100 text-amber-700',
-  red: 'bg-red-100 text-red-700',
-};
-
 export default function Alerts() {
-  const { activeCompany, isAdmin, isAdvanced, loading: appLoading } = useApp();
-  const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ kpi_name: '', condition: 'above', threshold: '', severity: 'yellow', message: '' });
-
-  const { data: alerts = [], isLoading } = useQuery({
-    queryKey: ['alerts', activeCompany?.id],
-    queryFn: () => activeCompany ? base44.entities.Alert.filter({ company_id: activeCompany.id }) : [],
-    enabled: !!activeCompany,
+  const { activeCompany, user, loading, isAdmin, isAdvanced } = useApp();
+  const [filters, setFilters] = useState({
+    module: 'todos',
+    status: 'todas',
+    creator: 'all',
   });
+  
+  const [alerts, setAlerts] = useState([]);
+  const [alertLogs, setAlertLogs] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editingAlert, setEditingAlert] = useState(null);
+  const [initialized, setInitialized] = useState(false);
 
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Alert.create({ ...data, company_id: activeCompany.id, is_active: true }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['alerts'] }); setShowForm(false); setForm({ kpi_name: '', condition: 'above', threshold: '', severity: 'yellow', message: '' }); },
-  });
+  const isDemo = !activeCompany?.holded_api_key || activeCompany?.is_demo;
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Alert.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
-  });
+  useEffect(() => {
+    if (activeCompany && !initialized) {
+      initializeSystemAlerts();
+      setInitialized(true);
+    }
+    if (activeCompany) {
+      loadAlerts();
+      loadAlertLogs();
+    }
+  }, [activeCompany]);
 
-  if (appLoading) return <LoadingState />;
+  async function initializeSystemAlerts() {
+    const existing = await base44.entities.Alert.filter({ company_id: activeCompany.id, is_system: true });
+    if (existing.length > 0) return;
 
-  const canCreate = isAdmin || isAdvanced;
+    for (const sysAlert of SYSTEM_ALERTS) {
+      await base44.entities.Alert.create({
+        ...sysAlert,
+        company_id: activeCompany.id,
+        is_system: true,
+        status: 'active',
+        channels: ['push', 'email'],
+        assigned_users: [user.email],
+        created_by: 'system',
+      });
+    }
+    toast.success('Alertas del sistema inicializadas');
+  }
+
+  async function loadAlerts() {
+    let query = { company_id: activeCompany.id };
+    
+    if (!isAdmin) {
+      query = {
+        ...query,
+        assigned_users: { $in: [user.email] },
+      };
+    }
+
+    const allAlerts = await base44.entities.Alert.list('-created_date');
+    setAlerts(allAlerts.filter(a => a.company_id === activeCompany.id));
+  }
+
+  async function loadAlertLogs() {
+    const logs = await base44.entities.AlertLog.filter({
+      company_id: activeCompany.id,
+    }, '-created_date', 50);
+    setAlertLogs(logs);
+  }
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter(alert => {
+      if (filters.module !== 'todos' && alert.module !== filters.module) return false;
+      if (filters.status !== 'todas') {
+        const statusMap = { activas: 'active', pausadas: 'paused', disparadas: 'triggered' };
+        if (alert.status !== statusMap[filters.status]) return false;
+      }
+      if (isAdmin && filters.creator !== 'all') {
+        if (filters.creator === 'system' && !alert.is_system) return false;
+        if (filters.creator === 'users' && alert.is_system) return false;
+      }
+      return true;
+    });
+  }, [alerts, filters, isAdmin]);
+
+  async function handleSaveAlert(formData) {
+    if (editingAlert) {
+      await base44.entities.Alert.update(editingAlert.id, {
+        ...formData,
+        company_id: activeCompany.id,
+        created_by: user.email,
+      });
+      toast.success('Alerta actualizada');
+    } else {
+      await base44.entities.Alert.create({
+        ...formData,
+        company_id: activeCompany.id,
+        status: 'active',
+        created_by: user.email,
+        assigned_users: [user.email],
+      });
+      toast.success('Alerta creada');
+    }
+    setShowModal(false);
+    setEditingAlert(null);
+    loadAlerts();
+  }
+
+  async function handleToggleStatus(alert) {
+    const newStatus = alert.status === 'active' ? 'paused' : 'active';
+    await base44.entities.Alert.update(alert.id, { status: newStatus });
+    toast.success(`Alerta ${newStatus === 'active' ? 'activada' : 'pausada'}`);
+    loadAlerts();
+  }
+
+  async function handleDeleteAlert(alertId) {
+    await base44.entities.Alert.delete(alertId);
+    toast.success('Alerta eliminada');
+    loadAlerts();
+  }
+
+  function handleEditAlert(alert) {
+    setEditingAlert(alert);
+    setShowModal(true);
+  }
+
+  function getConditionLabel(condition) {
+    const labels = {
+      greater_than: 'Mayor que',
+      less_than: 'Menor que',
+      equals: 'Igual a',
+    };
+    return labels[condition] || condition;
+  }
+
+  function getPeriodLabel(period) {
+    const labels = {
+      daily: 'Diario',
+      weekly: 'Semanal',
+      monthly: 'Mensual',
+      quarterly: 'Trimestral',
+    };
+    return labels[period] || period;
+  }
+
+  function formatThreshold(value, kpi) {
+    if (kpi.includes('saldo') || kpi.includes('cash') || kpi.includes('coste')) {
+      return formatCurrency(value);
+    }
+    if (kpi.includes('margen') || kpi.includes('peso') || kpi.includes('concentracion')) {
+      return `${value}%`;
+    }
+    return value.toString();
+  }
+
+  if (loading) return <LoadingState />;
 
   return (
-    <div className="max-w-[1200px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-[1600px] mx-auto">
+      {isDemo && <DemoBanner />}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-xl font-bold text-[#1B2731] font-['Space_Grotesk']">Alertas</h2>
-          <p className="text-xs text-[#3E4C59] mt-0.5">Configura alertas automáticas sobre tus KPIs</p>
+          <p className="text-xs text-[#3E4C59] mt-0.5">Gestión y configuración de notificaciones automáticas</p>
         </div>
-        {canCreate && (
-          <Dialog open={showForm} onOpenChange={setShowForm}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#33A19A] hover:bg-[#2B8A84] text-white">
-                <Plus className="w-4 h-4 mr-1.5" /> Nueva Alerta
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-white">
-              <DialogHeader>
-                <DialogTitle className="font-['Space_Grotesk']">Crear Alerta</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-2">
-                <Select value={form.kpi_name} onValueChange={(v) => setForm({ ...form, kpi_name: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecciona KPI" /></SelectTrigger>
-                  <SelectContent>
-                    {KPI_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="grid grid-cols-2 gap-3">
-                  <Select value={form.condition} onValueChange={(v) => setForm({ ...form, condition: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="above">Superior a</SelectItem>
-                      <SelectItem value="below">Inferior a</SelectItem>
-                      <SelectItem value="equals">Igual a</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input type="number" placeholder="Umbral" value={form.threshold} onChange={(e) => setForm({ ...form, threshold: e.target.value })} />
-                </div>
-                <Select value={form.severity} onValueChange={(v) => setForm({ ...form, severity: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="green">Normal</SelectItem>
-                    <SelectItem value="yellow">Atención</SelectItem>
-                    <SelectItem value="red">Crítico</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Mensaje personalizado (opcional)" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-                <Button
-                  className="w-full bg-[#33A19A] hover:bg-[#2B8A84] text-white"
-                  onClick={() => createMutation.mutate({ ...form, threshold: Number(form.threshold) })}
-                  disabled={!form.kpi_name || !form.threshold}
-                >
-                  Crear Alerta
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
 
-      {isLoading ? <LoadingState /> : alerts.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60">
-          <Bell className="w-12 h-12 text-[#B7CAC9] mx-auto mb-3" />
-          <p className="text-sm text-[#3E4C59]">No hay alertas configuradas</p>
-          {canCreate && <p className="text-xs text-[#B7CAC9] mt-1">Crea tu primera alerta para monitorizar tus KPIs</p>}
+      <AlertFilters
+        filters={filters}
+        onFilterChange={setFilters}
+        onCreateAlert={() => { setEditingAlert(null); setShowModal(true); }}
+        isAdmin={isAdmin}
+        isAdvanced={isAdvanced}
+      />
+
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 overflow-hidden mb-6">
+        <div className="p-5 border-b border-[#E8EEEE]">
+          <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk']">Alertas Configuradas</h3>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {alerts.map(alert => {
-            const kpiLabel = KPI_OPTIONS.find(o => o.value === alert.kpi_name)?.label || alert.kpi_name;
-            const condLabel = alert.condition === 'above' ? 'superior a' : alert.condition === 'below' ? 'inferior a' : 'igual a';
-            return (
-              <div key={alert.id} className="bg-white rounded-xl p-4 shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 flex items-center gap-4">
-                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${alert.severity === 'red' ? 'bg-[#E05252]' : alert.severity === 'yellow' ? 'bg-[#E6A817]' : 'bg-emerald-500'}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#1B2731]">{kpiLabel} {condLabel} {alert.threshold}</p>
-                  {alert.message && <p className="text-xs text-[#3E4C59] mt-0.5">{alert.message}</p>}
-                </div>
-                <Badge className={`${SEVERITY_COLORS[alert.severity]} text-xs`}>
-                  {alert.severity === 'red' ? 'Crítico' : alert.severity === 'yellow' ? 'Atención' : 'Normal'}
-                </Badge>
-                {canCreate && (
-                  <Button variant="ghost" size="icon" className="text-[#B7CAC9] hover:text-[#E05252]" onClick={() => deleteMutation.mutate(alert.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#F8F6F1]">
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">KPI</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Módulo</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Condición</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Umbral</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Período</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Estado</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Última Disparada</TableHead>
+                {(isAdmin || isAdvanced) && (
+                  <TableHead className="text-xs font-semibold text-[#3E4C59]">Acciones</TableHead>
                 )}
-              </div>
-            );
-          })}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAlerts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-[#B7CAC9] py-8">
+                    No hay alertas configuradas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAlerts.map((alert, i) => (
+                  <TableRow key={i} className="hover:bg-[#FDFBF7]">
+                    <TableCell className="text-sm text-[#1B2731] font-medium">
+                      {alert.kpi_label}
+                      {alert.is_system && (
+                        <Badge className="ml-2 bg-[#F8F6F1] text-[#3E4C59] text-xs">Sistema</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-[#3E4C59] capitalize">{alert.module}</TableCell>
+                    <TableCell className="text-sm text-[#3E4C59]">{getConditionLabel(alert.condition)}</TableCell>
+                    <TableCell className="text-sm text-[#1B2731] font-semibold">
+                      {formatThreshold(alert.threshold, alert.kpi_name)}
+                    </TableCell>
+                    <TableCell className="text-sm text-[#3E4C59]">{getPeriodLabel(alert.period)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${
+                          alert.status === 'triggered' ? 'bg-red-500 text-white' :
+                          alert.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-[#B7CAC9] text-white'
+                        } text-xs`}>
+                          {alert.status === 'triggered' ? 'Disparada' : alert.status === 'active' ? 'Activa' : 'Pausada'}
+                        </Badge>
+                        {alert.severity === 'red' ? (
+                          <AlertCircle className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#3E4C59]">
+                      {alert.last_triggered ? new Date(alert.last_triggered).toLocaleDateString('es-ES') : '—'}
+                    </TableCell>
+                    {(isAdmin || isAdvanced) && (
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={alert.status === 'active'}
+                            onCheckedChange={() => handleToggleStatus(alert)}
+                            disabled={alert.is_system && !isAdmin}
+                          />
+                          {(!alert.is_system || isAdmin) && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => handleEditAlert(alert)}>
+                                <Pencil className="w-4 h-4 text-[#3E4C59]" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteAlert(alert.id)}>
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 overflow-hidden">
+        <div className="p-5 border-b border-[#E8EEEE]">
+          <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk']">Historial de Alertas Disparadas</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#F8F6F1]">
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Fecha</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">KPI</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Valor Disparado</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Umbral</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Severidad</TableHead>
+                <TableHead className="text-xs font-semibold text-[#3E4C59]">Usuarios Notificados</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alertLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-[#B7CAC9] py-8">
+                    No hay historial de alertas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                alertLogs.slice(0, 20).map((log, i) => (
+                  <TableRow key={i} className="hover:bg-[#FDFBF7]">
+                    <TableCell className="text-sm text-[#1B2731]">
+                      {new Date(log.created_date).toLocaleString('es-ES')}
+                    </TableCell>
+                    <TableCell className="text-sm text-[#1B2731] font-medium">{log.kpi_label}</TableCell>
+                    <TableCell className="text-sm text-[#1B2731] font-semibold">
+                      {formatThreshold(log.triggered_value, log.kpi_name)}
+                    </TableCell>
+                    <TableCell className="text-sm text-[#3E4C59]">
+                      {formatThreshold(log.threshold, log.kpi_name)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${log.severity === 'red' ? 'bg-red-500' : 'bg-amber-500'} text-white text-xs`}>
+                        {log.severity === 'red' ? 'Crítico' : 'Aviso'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#3E4C59]">
+                      {(log.notified_users || []).length} usuario{(log.notified_users || []).length !== 1 ? 's' : ''}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {showModal && (
+        <AlertFormModal
+          open={showModal}
+          onClose={() => { setShowModal(false); setEditingAlert(null); }}
+          onSave={handleSaveAlert}
+          alert={editingAlert}
+        />
       )}
     </div>
   );
