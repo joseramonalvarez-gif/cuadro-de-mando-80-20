@@ -37,14 +37,16 @@ Deno.serve(async (req) => {
   }
 
   const body = await req.json();
-  const { action, company_id, endpoint, params } = body;
+  const { action, companyId, company_id, endpoint, params } = body;
 
-  if (!company_id) {
-    return Response.json({ error: 'company_id requerido' }, { status: 400 });
+  const finalCompanyId = companyId || company_id;
+
+  if (!finalCompanyId) {
+    return Response.json({ error: 'companyId requerido' }, { status: 400 });
   }
 
   // Get company and API key (service role to access the key)
-  const companies = await base44.asServiceRole.entities.Company.filter({ id: company_id });
+  const companies = await base44.asServiceRole.entities.Company.filter({ id: finalCompanyId });
   const company = companies[0];
   
   if (!company || !company.holded_api_key) {
@@ -60,7 +62,7 @@ Deno.serve(async (req) => {
 
     // Log the API call
     await base44.asServiceRole.entities.ApiLog.create({
-      company_id,
+      company_id: finalCompanyId,
       endpoint,
       method: 'GET',
       status_code: 200,
@@ -100,7 +102,7 @@ Deno.serve(async (req) => {
 
       // Cache the data
       const existing = await base44.asServiceRole.entities.CachedData.filter({
-        company_id,
+        company_id: finalCompanyId,
         data_type: ep.type,
       });
 
@@ -112,7 +114,7 @@ Deno.serve(async (req) => {
         });
       } else {
         await base44.asServiceRole.entities.CachedData.create({
-          company_id,
+          company_id: finalCompanyId,
           data_type: ep.type,
           data: { items: Array.isArray(data) ? data : [data] },
           last_fetched: new Date().toISOString(),
@@ -121,7 +123,7 @@ Deno.serve(async (req) => {
       }
 
       await base44.asServiceRole.entities.ApiLog.create({
-        company_id,
+        company_id: finalCompanyId,
         endpoint: ep.path,
         method: 'GET',
         status_code: 200,
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
     }
 
     // Update company last sync date
-    await base44.asServiceRole.entities.Company.update(company_id, {
+    await base44.asServiceRole.entities.Company.update(finalCompanyId, {
       last_sync_date: new Date().toISOString(),
       is_demo: false,
     });

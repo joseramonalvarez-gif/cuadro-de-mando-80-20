@@ -22,18 +22,17 @@ export default function CompanyFormModal({ company, onClose }) {
     setVerificationResult(null);
 
     try {
-      const response = await base44.functions.invoke('holdedApi', {
-        action: 'verify_connection',
+      const response = await base44.functions.invoke('verifyHoldedConnection', {
         apiKey: formData.holded_api_key,
       });
 
       if (response.data?.success) {
         setVerificationResult({ success: true, message: 'Conexión verificada correctamente' });
       } else {
-        setVerificationResult({ success: false, message: 'Error al verificar la conexión' });
+        setVerificationResult({ success: false, message: response.data?.message || 'Error al verificar la conexión' });
       }
     } catch (error) {
-      setVerificationResult({ success: false, message: error.message });
+      setVerificationResult({ success: false, message: error.message || 'Error de conexión' });
     }
 
     setVerifying(false);
