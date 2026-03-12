@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Building2, Users, Shield, Sliders, FileText, HelpCircle, BarChart3, Calendar } from 'lucide-react';
 import LoadingState from '../components/shared/LoadingState';
+import ProtectedRoute from '../components/layout/ProtectedRoute';
 import CompaniesSection from '../components/settings/CompaniesSection';
 import CostProfilesSection from '../components/settings/CostProfilesSection';
 import UsersSection from '../components/settings/UsersSection';
@@ -99,6 +100,7 @@ export default function SettingsPage() {
   }
 
   return (
+    <ProtectedRoute requiredRole="admin">
     <div className="max-w-[1200px] mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 rounded-xl bg-[#33A19A]/10">
@@ -196,5 +198,6 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </ProtectedRoute>
   );
 }
