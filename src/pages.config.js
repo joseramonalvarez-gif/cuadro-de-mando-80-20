@@ -59,6 +59,7 @@ import Taxes from './pages/Taxes';
 import Treasury from './pages/Treasury';
 import SalesNew from './pages/SalesNew';
 import PurchasesNew from './pages/PurchasesNew';
+import TreasuryNew from './pages/TreasuryNew';
 import __Layout from './Layout.jsx';
 
 
@@ -75,6 +76,7 @@ export const PAGES = {
     "Treasury": Treasury,
     "SalesNew": SalesNew,
     "PurchasesNew": PurchasesNew,
+    "TreasuryNew": TreasuryNew,
 }
 
 export const pagesConfig = {

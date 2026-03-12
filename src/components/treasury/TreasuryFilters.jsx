@@ -1,67 +1,71 @@
 import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import DateFilter from '../shared/DateFilter';
-import { Download, Bell, Bookmark } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Calendar, Filter } from 'lucide-react';
 
-export default function TreasuryFilters({ filters, onFilterChange, onExport, onCreateAlert, onSaveView, isAdmin, isAdvanced, accounts }) {
+export default function TreasuryFilters({ filters, onFiltersChange, cuentas }) {
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 mb-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <DateFilter onDateChange={(range) => onFilterChange({ ...filters, dateRange: range })} />
-        
-        <Select value={filters.account} onValueChange={(v) => onFilterChange({ ...filters, account: v })}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Cuenta Tesorería" />
+    <div className="bg-white rounded-xl border border-[#E8EEEE] p-4">
+      <div className="flex flex-wrap gap-3">
+        <Select 
+          value={filters.periodo} 
+          onValueChange={(val) => onFiltersChange({ ...filters, periodo: val })}
+        >
+          <SelectTrigger className="w-[140px]">
+            <Calendar className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mes">Este mes</SelectItem>
+            <SelectItem value="trimestre">Este trimestre</SelectItem>
+            <SelectItem value="año">Este año</SelectItem>
+            <SelectItem value="ytd">YTD</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select 
+          value={filters.cuenta} 
+          onValueChange={(val) => onFiltersChange({ ...filters, cuenta: val })}
+        >
+          <SelectTrigger className="w-[180px]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las cuentas</SelectItem>
-            {accounts.map((acc, i) => (
-              <SelectItem key={i} value={acc.id || acc.name}>{acc.name}</SelectItem>
+            {cuentas.map(c => (
+              <SelectItem key={c.cuentaId} value={c.cuentaId}>
+                {c.nombre}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={filters.type} onValueChange={(v) => onFilterChange({ ...filters, type: v })}>
-          <SelectTrigger className="w-32">
-            <SelectValue placeholder="Tipo" />
+        <Select 
+          value={filters.tipo} 
+          onValueChange={(val) => onFiltersChange({ ...filters, tipo: val })}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="cobros">Cobros</SelectItem>
-            <SelectItem value="pagos">Pagos</SelectItem>
+            <SelectItem value="all">Cobros y Pagos</SelectItem>
+            <SelectItem value="cobros">Solo Cobros</SelectItem>
+            <SelectItem value="pagos">Solo Pagos</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={filters.forecastPeriod} onValueChange={(v) => onFilterChange({ ...filters, forecastPeriod: v })}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Previsión" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="30">30 días</SelectItem>
-            <SelectItem value="60">60 días</SelectItem>
-            <SelectItem value="90">90 días</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" onClick={onSaveView}>
-            <Bookmark className="w-4 h-4 mr-2" />
-            Guardar
-          </Button>
-          {(isAdmin || isAdvanced) && (
-            <>
-              <Button variant="outline" size="sm" onClick={onCreateAlert}>
-                <Bell className="w-4 h-4 mr-2" />
-                Alerta
-              </Button>
-              <Button variant="outline" size="sm" onClick={onExport}>
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </Button>
-            </>
-          )}
-        </div>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => onFiltersChange({
+            periodo: 'mes',
+            cuenta: 'all',
+            tipo: 'all'
+          })}
+        >
+          Resetear
+        </Button>
       </div>
     </div>
   );
