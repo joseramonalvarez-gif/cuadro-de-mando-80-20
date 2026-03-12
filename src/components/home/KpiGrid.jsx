@@ -12,7 +12,7 @@ export default function KpiGrid({ kpis }) {
 
   const cards = [
     { key: 'ventas_netas', title: 'Ventas Netas', format: formatCurrency, icon: DollarSign },
-    { key: 'margen_bruto', title: 'Margen Bruto', format: formatPercent, icon: Percent },
+    { key: 'margen_bruto', title: 'Margen Bruto', format: (v) => formatPercent(v), icon: Percent, showCoverage: true },
     { key: 'ebitda', title: 'EBITDA', format: formatPercent, icon: Target },
     { key: 'punto_equilibrio', title: 'Punto de Equilibrio', format: formatCurrency, icon: TrendingUp },
     { key: 'opex_ventas', title: 'OPEX % s/ Ventas', format: formatPercent, icon: Receipt },
@@ -35,6 +35,13 @@ export default function KpiGrid({ kpis }) {
       {cards.map(card => {
         const data = kpis[card.key];
         if (!data) return null;
+        
+        // Añadir indicador de cobertura para margen
+        let subtitleText = card.subtitle;
+        if (card.showCoverage && data.cobertura !== undefined) {
+          subtitleText = `sobre ${Math.round(data.cobertura)}% de ventas`;
+        }
+        
         return (
           <KpiCard
             key={card.key}
@@ -43,7 +50,7 @@ export default function KpiGrid({ kpis }) {
             trend={data.trend}
             status={data.status}
             icon={card.icon}
-            subtitle={card.subtitle}
+            subtitle={subtitleText}
           />
         );
       })}

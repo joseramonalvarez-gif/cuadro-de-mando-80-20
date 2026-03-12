@@ -17,10 +17,11 @@ import { toast } from 'sonner';
 import { filtrarPorFechas, convertirAEUR } from '@/components/shared/kpiCalculations';
 
 function calculatePurchaseMetrics(invoices, contacts) {
-  const total = invoices.reduce((sum, inv) => 
+  const facturasValidas = invoices.filter(inv => inv.contactId);
+  const total = facturasValidas.reduce((sum, inv) => 
     sum + convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange), 0
   );
-  const count = invoices.length;
+  const count = facturasValidas.length;
   const avgTicket = count > 0 ? total / count : 0;
   
   const supplierIds = new Set(invoices.map(inv => inv.contactId));

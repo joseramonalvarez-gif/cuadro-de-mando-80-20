@@ -101,7 +101,12 @@ export default function Home() {
     return {
       kpis: {
         ventas_netas: { value: ventasNetas, trend: 0, status: 'green' },
-        margen_bruto: { value: margenData.margenPct, trend: 0, status: margenData.margenPct > 25 ? 'green' : 'yellow' },
+        margen_bruto: { 
+          value: margenData.margenPct, 
+          trend: 0, 
+          status: margenData.margenPct > 25 ? 'green' : 'yellow',
+          cobertura: margenData.cobertura
+        },
         clientes_activos: { value: clientesActivos, trend: 0, status: 'green' },
         caja_actual: { value: saldoTesoreria, trend: 0, status: 'green' },
       },
