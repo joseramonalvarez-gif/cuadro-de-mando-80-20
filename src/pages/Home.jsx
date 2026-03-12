@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 import { useApp } from '../components/shared/DemoContext';
 import { generateDemoData } from '../components/shared/DemoData';
 import DemoBanner from '../components/shared/DemoBanner';
@@ -13,9 +14,67 @@ import TopClientesChart from '../components/home/TopClientesChart';
 export default function Home() {
   const { activeCompany, loading } = useApp();
   const [dateRange, setDateRange] = useState(null);
+  const [realData, setRealData] = useState(null);
 
   const isDemo = !activeCompany?.holded_api_key || activeCompany?.is_demo;
-  const data = useMemo(() => generateDemoData(), []);
+  
+  useEffect(() => {
+    if (!isDemo && activeCompany) {
+      loadRealData();
+    }
+  }, [activeCompany, isDemo]);
+
+  async function loadRealData() {
+    const dataTypes = ['invoices_sale', 'invoices_purchase', 'contacts', 'treasuries'];
+    const loaded = {};
+    
+    for (const type of dataTypes) {
+      const cached = await base44.entities.CachedData.filter({
+        company_id: activeCompany.id,
+        data_type: type,
+      });
+      if (cached.length > 0 && cached[0].data?.items) {
+        loaded[type] = cached[0].data.items;
+      }
+    }
+    
+    if (Object.keys(loaded).length > 0) {
+      setRealData(loaded);
+    }
+  }
+
+  const data = useMemo(() => {
+    if (isDemo || !realData) {
+      return generateDemoData();
+    }
+    
+    // Calculate real KPIs from cached data
+    const invoicesSale = realData.invoices_sale || [];
+    const invoicesPurchase = realData.invoices_purchase || [];
+    const contacts = realData.contacts || [];
+    const treasuries = realData.treasuries || [];
+    
+    const totalVentas = invoicesSale.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const totalCompras = invoicesPurchase.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const margenBruto = totalVentas - totalCompras;
+    const margenBrutoPercent = totalVentas > 0 ? (margenBruto / totalVentas) * 100 : 0;
+    
+    const clientesActivos = contacts.filter(c => c.type === 'client' || c.clientRecord).length;
+    const saldoTesoreria = treasuries.reduce((sum, t) => sum + (t.balance || 0), 0);
+    
+    return {
+      kpis: {
+        ventas: { value: totalVentas, trend: 0, status: 'green' },
+        margen_bruto: { value: margenBrutoPercent, trend: 0, status: 'green' },
+        clientes_activos: { value: clientesActivos, trend: 0, status: 'green' },
+        tesoreria: { value: saldoTesoreria, trend: 0, status: 'green' },
+      },
+      ventasVsCompras: generateDemoData().ventasVsCompras,
+      concentracionClientes: generateDemoData().concentracionClientes,
+      previsionTesoreria: generateDemoData().previsionTesoreria,
+      topClientes: generateDemoData().topClientes,
+    };
+  }, [isDemo, realData]);
 
   if (loading) return <LoadingState />;
 
