@@ -38,8 +38,13 @@ export default function KpiGrid({ kpis }) {
         
         // Añadir indicador de cobertura para margen
         let subtitleText = card.subtitle;
+        let infoText = null;
+        
         if (card.showCoverage && data.cobertura !== undefined) {
           subtitleText = `sobre ${Math.round(data.cobertura)}% de ventas`;
+          if (data.cobertura < 100) {
+            infoText = `Este margen se calcula solo sobre las ${Math.round(data.cobertura)}% de ventas que tienen coste conocido. Completa los costes en Holded para mayor precisión.`;
+          }
         }
         
         return (
@@ -51,6 +56,7 @@ export default function KpiGrid({ kpis }) {
             status={data.status}
             icon={card.icon}
             subtitle={subtitleText}
+            info={infoText}
           />
         );
       })}
