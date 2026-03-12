@@ -28,6 +28,30 @@ async function fetchHolded(apiKey, endpoint, retries = 0) {
   return response.json();
 }
 
+async function fetchHoldedAllPages(apiKey, endpoint) {
+  let allData = [];
+  let page = 1;
+  let hasMore = true;
+  
+  while (hasMore) {
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const pagedEndpoint = `${endpoint}${separator}page=${page}`;
+    const data = await fetchHolded(apiKey, pagedEndpoint);
+    
+    if (Array.isArray(data) && data.length > 0) {
+      allData = [...allData, ...data];
+      hasMore = data.length >= 100;
+      page++;
+    } else if (Array.isArray(data)) {
+      hasMore = false;
+    } else {
+      return data;
+    }
+  }
+  
+  return allData.length > 0 ? allData : [];
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -68,7 +92,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'endpoint requerido para action=fetch' }, { status: 400 });
       }
 
-      const data = await fetchHolded(apiKey, endpoint);
+      const data = await fetchHoldedAllPages(apiKey, endpoint);
       const elapsed = Date.now() - startTime;
 
       // Log the API call
@@ -112,7 +136,7 @@ Deno.serve(async (req) => {
     for (const ep of endpoints) {
       try {
         const epStart = Date.now();
-        const data = await fetchHolded(apiKey, ep.path);
+        const data = await fetchHoldedAllPages(apiKey, ep.path);
         const elapsed = Date.now() - epStart;
 
         // Cache the data

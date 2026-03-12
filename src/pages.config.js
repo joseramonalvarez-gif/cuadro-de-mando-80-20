@@ -53,12 +53,12 @@ import Home from './pages/Home';
 import HumanResources from './pages/HumanResources';
 import Products from './pages/Products';
 import Purchases from './pages/Purchases';
+import PurchasesNew from './pages/PurchasesNew';
 import Sales from './pages/Sales';
+import SalesNew from './pages/SalesNew';
 import Settings from './pages/Settings';
 import Taxes from './pages/Taxes';
 import Treasury from './pages/Treasury';
-import SalesNew from './pages/SalesNew';
-import PurchasesNew from './pages/PurchasesNew';
 import TreasuryNew from './pages/TreasuryNew';
 import __Layout from './Layout.jsx';
 
@@ -70,12 +70,12 @@ export const PAGES = {
     "HumanResources": HumanResources,
     "Products": Products,
     "Purchases": Purchases,
+    "PurchasesNew": PurchasesNew,
     "Sales": Sales,
+    "SalesNew": SalesNew,
     "Settings": Settings,
     "Taxes": Taxes,
     "Treasury": Treasury,
-    "SalesNew": SalesNew,
-    "PurchasesNew": PurchasesNew,
     "TreasuryNew": TreasuryNew,
 }
 
