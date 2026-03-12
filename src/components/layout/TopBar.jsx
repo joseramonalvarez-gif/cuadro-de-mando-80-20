@@ -17,7 +17,7 @@ export default function TopBar({ title, onToggleSidebar }) {
     setSyncing(true);
     
     try {
-      await base44.functions.invoke('holdedApi', {
+      const response = await base44.functions.invoke('holdedApi', {
         companyId: activeCompany.id,
         action: 'sync_all',
       });
@@ -27,15 +27,16 @@ export default function TopBar({ title, onToggleSidebar }) {
         action: 'etl_refresh',
         module: 'system',
         company_id: activeCompany.id,
-        details: { manual: true },
+        details: { manual: true, results: response.data },
       });
       
+      // Refresh context and reload page to show new data
       await refreshCompanies();
+      window.location.reload();
     } catch (error) {
       console.error('Sync error:', error);
+      setSyncing(false);
     }
-    
-    setSyncing(false);
   }
 
   return (
