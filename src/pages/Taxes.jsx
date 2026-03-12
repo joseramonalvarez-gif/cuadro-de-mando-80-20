@@ -1,314 +1,241 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../components/shared/DemoContext';
-import { generateDemoData, formatCurrency } from '../components/shared/DemoData';
 import { base44 } from '@/api/base44Client';
-import DemoBanner from '../components/shared/DemoBanner';
 import LoadingState from '../components/shared/LoadingState';
-import KpiCard from '../components/shared/KpiCard';
+import DemoBanner from '../components/shared/DemoBanner';
+import TaxKPIs from '../components/taxes/TaxKPIs';
 import VATBreakdownChart from '../components/taxes/VATBreakdownChart';
 import QuarterlyEvolutionChart from '../components/taxes/QuarterlyEvolutionChart';
 import TaxCalendar from '../components/taxes/TaxCalendar';
 import TaxFilters from '../components/taxes/TaxFilters';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Receipt, FileText, TrendingDown, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
-
-function calculateTaxMetrics(invoicesSale, invoicesPurchase, taxes) {
-  const ivaRepercutido = invoicesSale.reduce((sum, inv) => {
-    const taxAmount = inv.tax || inv.taxAmount || (inv.total * 0.21);
-    return sum + taxAmount;
-  }, 0);
-
-  const ivaSoportado = invoicesPurchase.reduce((sum, inv) => {
-    const taxAmount = inv.tax || inv.taxAmount || (inv.total * 0.21);
-    return sum + taxAmount;
-  }, 0);
-
-  const saldoIVA = ivaRepercutido - ivaSoportado;
-
-  const retencionesPracticadas = invoicesSale.reduce((sum, inv) => {
-    const retention = inv.retention || (inv.total * 0.15);
-    return sum + retention;
-  }, 0) * 0.05;
-
-  const retencionesSoportadas = invoicesPurchase.reduce((sum, inv) => {
-    const retention = inv.retention || (inv.total * 0.15);
-    return sum + retention;
-  }, 0) * 0.03;
-
-  const otrosImpuestos = 2850;
-
-  return {
-    iva_repercutido: { value: ivaRepercutido, prev: ivaRepercutido * 0.92, trend: 8.7, status: 'green' },
-    iva_soportado: { value: ivaSoportado, prev: ivaSoportado * 0.94, trend: 6.4, status: 'yellow' },
-    saldo_iva: { value: saldoIVA, prev: saldoIVA * 0.88, trend: saldoIVA > 0 ? 13.6 : -13.6, status: saldoIVA > 0 ? 'yellow' : 'green' },
-    retenciones_practicadas: { value: retencionesPracticadas, prev: retencionesPracticadas * 0.91, trend: 9.9, status: 'green' },
-    retenciones_soportadas: { value: retencionesSoportadas, prev: retencionesSoportadas * 0.96, trend: 4.2, status: 'green' },
-    otros_impuestos: { value: otrosImpuestos, prev: otrosImpuestos * 1.02, trend: -2.0, status: 'green' },
-  };
-}
-
-function calculateVATBreakdown() {
-  const breakdown = [
-    { name: '21%', base: 320500, iva: 67305, percent: 0 },
-    { name: '10%', base: 85200, iva: 8520, percent: 0 },
-    { name: '4%', base: 42100, iva: 1684, percent: 0 },
-    { name: '0%', base: 18500, iva: 0, percent: 0 },
-    { name: 'Exento', base: 21200, iva: 0, percent: 0 },
-  ];
-  
-  const total = breakdown.reduce((sum, b) => sum + b.iva, 0);
-  breakdown.forEach(b => b.percent = total > 0 ? (b.iva / total) * 100 : 0);
-  
-  return breakdown.filter(b => b.iva > 0);
-}
-
-function generateQuarterlyData() {
-  return [
-    { trimestre: 'Q4 2025', repercutido: 68200, soportado: 45300, saldo: 22900 },
-    { trimestre: 'Q1 2026', repercutido: 77509, soportado: 53209, saldo: 24300 },
-  ];
-}
-
-function generateTaxDeadlines() {
-  return [
-    { modelo: 'Modelo 303 (IVA)', periodo: 'T1 2026', fecha_limite: '20/04/2026', importe: 24300, estado: 'pendiente' },
-    { modelo: 'Modelo 111 (Retenciones)', periodo: 'Marzo 2026', fecha_limite: '20/04/2026', importe: 3850, estado: 'pendiente' },
-    { modelo: 'Modelo 130 (IRPF)', periodo: 'T1 2026', fecha_limite: '20/04/2026', importe: 12500, estado: 'pendiente' },
-    { modelo: 'Modelo 349 (Intracomunitarias)', periodo: 'T1 2026', fecha_limite: '30/04/2026', importe: 0, estado: 'pendiente' },
-    { modelo: 'Modelo 347 (Operaciones)', periodo: 'Anual 2025', fecha_limite: '28/02/2026', importe: 0, estado: 'presentado' },
-  ];
-}
-
-function generateRetentionDetails() {
-  return [
-    { concepto: 'Servicios profesionales — ABC Consulting', base: 18500, percent: 15, retenido: 2775 },
-    { concepto: 'Arrendamiento local comercial', base: 12000, percent: 19, retenido: 2280 },
-    { concepto: 'Honorarios profesionales externos', base: 8500, percent: 15, retenido: 1275 },
-    { concepto: 'Asesoría fiscal y contable', base: 3200, percent: 15, retenido: 480 },
-    { concepto: 'Formación y cursos', base: 1500, percent: 15, retenido: 225 },
-  ];
-}
 
 export default function Taxes() {
-  const { activeCompany, loading, isAdmin, isAdvanced } = useApp();
+  const { activeCompany, loading: contextLoading } = useApp();
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    period: 'quarter',
-    taxType: 'all',
-    comparison: 'yoy',
+    periodo: 'trimestre',
+    tipoImpuesto: 'all',
+    comparativa: 'none'
   });
+  
+  const [kpis, setKpis] = useState({});
+  const [vatBreakdown, setVatBreakdown] = useState([]);
+  const [quarterlyData, setQuarterlyData] = useState([]);
+  const [vencimientos, setVencimientos] = useState([]);
 
-  const demoData = useMemo(() => generateDemoData(), []);
   const isDemo = !activeCompany?.holded_api_key || activeCompany?.is_demo;
 
-  const [realInvoicesSale, setRealInvoicesSale] = useState([]);
-  const [realInvoicesPurchase, setRealInvoicesPurchase] = useState([]);
-  const [realTaxes, setRealTaxes] = useState([]);
-
   useEffect(() => {
-    if (!isDemo && activeCompany) {
-      loadRealData();
+    if (!contextLoading && activeCompany) {
+      loadTaxData();
     }
-  }, [activeCompany, isDemo]);
+  }, [activeCompany, contextLoading, filters.periodo]);
 
-  async function loadRealData() {
-    const dataTypes = ['invoices_sale', 'invoices_purchase', 'taxes'];
-    for (const type of dataTypes) {
-      const cached = await base44.entities.CachedData.filter({
-        company_id: activeCompany.id,
-        data_type: type,
-      });
-      if (cached.length > 0 && cached[0].data?.items) {
-        const items = cached[0].data.items;
-        if (type === 'invoices_sale') setRealInvoicesSale(items);
-        else if (type === 'invoices_purchase') setRealInvoicesPurchase(items);
-        else if (type === 'taxes') setRealTaxes(items);
-      }
-    }
-  }
-
-  const metrics = useMemo(() => {
+  async function loadTaxData() {
+    setLoading(true);
+    
     if (isDemo) {
-      return {
-        iva_repercutido: { value: 102341, prev: 94200, trend: 8.6, status: 'green' },
-        iva_soportado: { value: 65609, prev: 61800, trend: 6.2, status: 'yellow' },
-        saldo_iva: { value: 36732, prev: 32400, trend: 13.4, status: 'yellow' },
-        retenciones_practicadas: { value: 7285, prev: 6650, trend: 9.5, status: 'green' },
-        retenciones_soportadas: { value: 4820, prev: 4580, trend: 5.2, status: 'green' },
-        otros_impuestos: { value: 2850, prev: 2910, trend: -2.1, status: 'green' },
-      };
+      setKpis(generateDemoKPIs());
+      setVatBreakdown(generateDemoVATBreakdown());
+      setQuarterlyData(generateDemoQuarterly());
+      setVencimientos(generateDemoVencimientos());
+      setLoading(false);
+      return;
     }
-    return calculateTaxMetrics(realInvoicesSale, realInvoicesPurchase, realTaxes);
-  }, [isDemo, realInvoicesSale, realInvoicesPurchase, realTaxes]);
 
-  const vatBreakdown = useMemo(() => calculateVATBreakdown(), []);
-  const quarterlyData = useMemo(() => generateQuarterlyData(), []);
-  const taxDeadlines = useMemo(() => generateTaxDeadlines(), []);
-  const retentionDetails = useMemo(() => generateRetentionDetails(), []);
+    try {
+      const [lineasVenta, lineasCompra] = await Promise.all([
+        base44.entities.LineasVenta.filter({ company_id: activeCompany.id }),
+        base44.entities.LineasCompra.filter({ company_id: activeCompany.id })
+      ]);
 
-  function handleExport() {
-    toast.success('Exportación de resumen fiscal iniciada');
+      const calculatedKPIs = calculateTaxKPIs(lineasVenta, lineasCompra);
+      setKpis(calculatedKPIs);
+
+      const breakdown = calculateVATBreakdown(lineasVenta);
+      setVatBreakdown(breakdown);
+
+      const quarterly = calculateQuarterly(lineasVenta, lineasCompra);
+      setQuarterlyData(quarterly);
+
+      const fiscal = generateFiscalCalendar(calculatedKPIs, quarterly);
+      setVencimientos(fiscal);
+
+    } catch (error) {
+      console.error('Error loading tax data:', error);
+    }
+    
+    setLoading(false);
   }
 
-  function handleCreateAlert() {
-    toast.success('Función de alertas próximamente');
+  function calculateTaxKPIs(lineasVenta, lineasCompra) {
+    // Calcular IVA repercutido (asumiendo 21% si no hay datos de impuestos)
+    const ivaRepercutido = lineasVenta
+      .filter(l => !l.esDevolucion)
+      .reduce((sum, l) => {
+        const taxRate = 21; // TODO: obtener de impuestoId cruzado con /taxes
+        return sum + ((l.importeNeto || 0) * taxRate / 100);
+      }, 0);
+
+    // Calcular IVA soportado
+    const ivaSoportado = lineasCompra
+      .filter(l => !l.esDevolucion)
+      .reduce((sum, l) => {
+        const taxRate = 21;
+        return sum + ((l.importeNeto || 0) * taxRate / 100);
+      }, 0);
+
+    // Retenciones (simplificado - asumir 15% IRPF en servicios profesionales)
+    const retencionesPracticadas = lineasVenta
+      .filter(l => l.esServicio)
+      .reduce((sum, l) => sum + ((l.importeNeto || 0) * 0.15), 0);
+
+    const retencionesSoportadas = lineasCompra
+      .filter(l => l.tipoGasto === 'subcontratacion')
+      .reduce((sum, l) => sum + ((l.importeNeto || 0) * 0.15), 0);
+
+    return {
+      ivaRepercutido,
+      ivaSoportado,
+      retencionesPracticadas,
+      retencionesSoportadas
+    };
   }
 
-  function handleSaveView() {
-    toast.success('Vista guardada');
+  function calculateVATBreakdown(lineasVenta) {
+    const breakdown = {
+      '21%': { baseImponible: 0, cuotaIVA: 0 },
+      '10%': { baseImponible: 0, cuotaIVA: 0 },
+      '4%': { baseImponible: 0, cuotaIVA: 0 },
+      '0%': { baseImponible: 0, cuotaIVA: 0 },
+      'Exento': { baseImponible: 0, cuotaIVA: 0 }
+    };
+
+    lineasVenta.forEach(linea => {
+      const base = linea.importeNeto || 0;
+      // TODO: obtener taxRate real del impuestoId
+      const tipo = '21%'; // Asumiendo 21% por defecto
+      
+      breakdown[tipo].baseImponible += base;
+      breakdown[tipo].cuotaIVA += base * 0.21;
+    });
+
+    const totalIVA = Object.values(breakdown).reduce((sum, item) => sum + item.cuotaIVA, 0);
+
+    return Object.entries(breakdown)
+      .filter(([_, data]) => data.cuotaIVA > 0)
+      .map(([tipo, data]) => ({
+        tipo,
+        baseImponible: data.baseImponible,
+        cuotaIVA: data.cuotaIVA,
+        pctSobreTotal: totalIVA > 0 ? (data.cuotaIVA / totalIVA) * 100 : 0
+      }));
   }
 
-  if (loading) return <LoadingState />;
+  function calculateQuarterly(lineasVenta, lineasCompra) {
+    const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+    
+    return quarters.map((q, idx) => {
+      const ventasQ = lineasVenta.filter(l => l.trimestre === idx + 1);
+      const comprasQ = lineasCompra.filter(l => l.trimestre === idx + 1);
 
-  const saldoPositivo = metrics.saldo_iva.value > 0;
-  const umbralAlerta = 40000;
-  const alertaSaldo = Math.abs(metrics.saldo_iva.value) > umbralAlerta;
+      const repercutido = ventasQ.reduce((sum, l) => sum + ((l.importeNeto || 0) * 0.21), 0);
+      const soportado = comprasQ.reduce((sum, l) => sum + ((l.importeNeto || 0) * 0.21), 0);
+
+      return {
+        trimestre: q,
+        repercutido,
+        soportado,
+        saldo: repercutido - soportado
+      };
+    });
+  }
+
+  function generateFiscalCalendar(kpis, quarterly) {
+    const vencimientos = [];
+    const año = new Date().getFullYear();
+
+    // Modelo 303 (IVA trimestral)
+    quarterly.forEach((q, idx) => {
+      const mesVencimiento = (idx + 1) * 3; // Marzo, Junio, Septiembre, Diciembre
+      vencimientos.push({
+        modelo: 'Modelo 303',
+        periodo: `${q.trimestre} ${año}`,
+        fechaLimite: `${año}-${mesVencimiento.toString().padStart(2, '0')}-20`,
+        importeEstimado: Math.abs(q.saldo),
+        estado: idx < 1 ? 'presentado' : 'pendiente'
+      });
+    });
+
+    // Modelo 111 (Retenciones trimestrales)
+    if (kpis.retencionesPracticadas > 0) {
+      vencimientos.push({
+        modelo: 'Modelo 111',
+        periodo: 'Q1 ' + año,
+        fechaLimite: `${año}-04-20`,
+        importeEstimado: kpis.retencionesPracticadas / 4,
+        estado: 'pendiente'
+      });
+    }
+
+    return vencimientos.sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
+  }
+
+  function generateDemoKPIs() {
+    return {
+      ivaRepercutido: 95000,
+      ivaSoportado: 42000,
+      retencionesPracticadas: 18500,
+      retencionesSoportadas: 8200
+    };
+  }
+
+  function generateDemoVATBreakdown() {
+    return [
+      { tipo: '21%', baseImponible: 380000, cuotaIVA: 79800, pctSobreTotal: 84 },
+      { tipo: '10%', baseImponible: 95000, cuotaIVA: 9500, pctSobreTotal: 10 },
+      { tipo: '4%', baseImponible: 60000, cuotaIVA: 2400, pctSobreTotal: 2.5 },
+      { tipo: '0%', baseImponible: 15000, cuotaIVA: 0, pctSobreTotal: 0 },
+      { tipo: 'Exento', baseImponible: 25000, cuotaIVA: 0, pctSobreTotal: 0 }
+    ];
+  }
+
+  function generateDemoQuarterly() {
+    return [
+      { trimestre: 'Q1', repercutido: 88000, soportado: 38000, saldo: 50000 },
+      { trimestre: 'Q2', repercutido: 95000, soportado: 42000, saldo: 53000 },
+      { trimestre: 'Q3', repercutido: 102000, soportado: 45000, saldo: 57000 },
+      { trimestre: 'Q4', repercutido: 110000, soportado: 48000, saldo: 62000 }
+    ];
+  }
+
+  function generateDemoVencimientos() {
+    return [
+      { modelo: 'Modelo 303', periodo: 'Q1 2026', fechaLimite: '2026-04-20', importeEstimado: 50000, estado: 'pendiente' },
+      { modelo: 'Modelo 111', periodo: 'Q1 2026', fechaLimite: '2026-04-20', importeEstimado: 18500, estado: 'pendiente' },
+      { modelo: 'Modelo 303', periodo: 'Q2 2026', fechaLimite: '2026-07-20', importeEstimado: 53000, estado: 'pendiente' },
+      { modelo: 'Modelo 190', periodo: 'Anual 2025', fechaLimite: '2026-01-31', importeEstimado: 0, estado: 'presentado' }
+    ];
+  }
+
+  if (contextLoading || loading) {
+    return <LoadingState message="Cargando análisis fiscal..." />;
+  }
 
   return (
-    <div className="max-w-[1600px] mx-auto">
+    <div className="space-y-6">
       {isDemo && <DemoBanner />}
+      
+      <TaxFilters filters={filters} onFiltersChange={setFilters} />
+      
+      <TaxKPIs kpis={kpis} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-[#1B2731] font-['Space_Grotesk']">Fiscalidad</h2>
-          <p className="text-xs text-[#3E4C59] mt-0.5">Control de IVA, retenciones y calendario fiscal</p>
-        </div>
-      </div>
-
-      <TaxFilters
-        filters={filters}
-        onFilterChange={setFilters}
-        onExport={handleExport}
-        onCreateAlert={handleCreateAlert}
-        onSaveView={handleSaveView}
-        isAdmin={isAdmin}
-        isAdvanced={isAdvanced}
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <KpiCard 
-          title="IVA Repercutido" 
-          value={formatCurrency(metrics.iva_repercutido.value)} 
-          trend={metrics.iva_repercutido.trend} 
-          status={metrics.iva_repercutido.status} 
-          icon={Receipt} 
-        />
-        <KpiCard 
-          title="IVA Soportado" 
-          value={formatCurrency(metrics.iva_soportado.value)} 
-          trend={metrics.iva_soportado.trend} 
-          status={metrics.iva_soportado.status} 
-          icon={FileText} 
-        />
-        <KpiCard 
-          title="Saldo IVA" 
-          value={formatCurrency(metrics.saldo_iva.value)} 
-          trend={metrics.saldo_iva.trend} 
-          status={metrics.saldo_iva.status} 
-          icon={saldoPositivo ? TrendingUp : TrendingDown} 
-        />
-        <KpiCard 
-          title="Retenciones Practicadas" 
-          value={formatCurrency(metrics.retenciones_practicadas.value)} 
-          trend={metrics.retenciones_practicadas.trend} 
-          status={metrics.retenciones_practicadas.status} 
-          icon={DollarSign} 
-        />
-        <KpiCard 
-          title="Retenciones Soportadas" 
-          value={formatCurrency(metrics.retenciones_soportadas.value)} 
-          trend={metrics.retenciones_soportadas.trend} 
-          status={metrics.retenciones_soportadas.status} 
-          icon={DollarSign} 
-        />
-        <KpiCard 
-          title="Otros Impuestos" 
-          value={formatCurrency(metrics.otros_impuestos.value)} 
-          trend={metrics.otros_impuestos.trend} 
-          status={metrics.otros_impuestos.status} 
-          icon={AlertCircle} 
-        />
-      </div>
-
-      {alertaSaldo && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600" />
-          <div>
-            <p className="text-sm font-semibold text-[#1B2731]">
-              Alerta: Saldo IVA {saldoPositivo ? 'a pagar' : 'a devolver'} supera {formatCurrency(umbralAlerta)}
-            </p>
-            <p className="text-xs text-[#3E4C59] mt-1">
-              Saldo actual: {formatCurrency(metrics.saldo_iva.value)} {saldoPositivo ? '(pendiente de pago)' : '(pendiente de devolución)'}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="mb-6">
-        <TaxCalendar deadlines={taxDeadlines} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <VATBreakdownChart data={vatBreakdown} />
         <QuarterlyEvolutionChart data={quarterlyData} />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 overflow-hidden mb-6">
-        <div className="p-5 border-b border-[#E8EEEE]">
-          <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk']">Desglose IVA por Tipo</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F6F1]">
-                <TableHead className="text-xs font-semibold text-[#3E4C59]">Tipo IVA</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">Base Imponible</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">IVA €</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">% sobre Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vatBreakdown.map((vat, i) => (
-                <TableRow key={i} className="hover:bg-[#FDFBF7]">
-                  <TableCell className="text-sm text-[#1B2731] font-medium">{vat.name}</TableCell>
-                  <TableCell className="text-sm text-[#3E4C59] text-right">{formatCurrency(vat.base)}</TableCell>
-                  <TableCell className="text-sm text-[#1B2731] text-right font-semibold">{formatCurrency(vat.iva)}</TableCell>
-                  <TableCell className="text-sm text-[#33A19A] text-right font-semibold">{vat.percent.toFixed(1)}%</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 overflow-hidden">
-        <div className="p-5 border-b border-[#E8EEEE]">
-          <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk']">Detalle de Retenciones</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F6F1]">
-                <TableHead className="text-xs font-semibold text-[#3E4C59]">Concepto</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">Base</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">% Retención</TableHead>
-                <TableHead className="text-xs font-semibold text-[#3E4C59] text-right">Importe Retenido</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {retentionDetails.map((ret, i) => (
-                <TableRow key={i} className="hover:bg-[#FDFBF7]">
-                  <TableCell className="text-sm text-[#1B2731] font-medium">{ret.concepto}</TableCell>
-                  <TableCell className="text-sm text-[#3E4C59] text-right">{formatCurrency(ret.base)}</TableCell>
-                  <TableCell className="text-sm text-[#3E4C59] text-right">{ret.percent}%</TableCell>
-                  <TableCell className="text-sm text-[#1B2731] text-right font-semibold">{formatCurrency(ret.retenido)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+      <TaxCalendar vencimientos={vencimientos} />
     </div>
   );
 }
