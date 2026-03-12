@@ -57,6 +57,7 @@ import Sales from './pages/Sales';
 import Settings from './pages/Settings';
 import Taxes from './pages/Taxes';
 import Treasury from './pages/Treasury';
+import SalesNew from './pages/SalesNew';
 import __Layout from './Layout.jsx';
 
 
@@ -71,6 +72,7 @@ export const PAGES = {
     "Settings": Settings,
     "Taxes": Taxes,
     "Treasury": Treasury,
+    "SalesNew": SalesNew,
 }
 
 export const pagesConfig = {
