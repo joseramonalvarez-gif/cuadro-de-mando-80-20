@@ -88,7 +88,7 @@ export default function TopBar({ title, onToggleSidebar }) {
           </Button>
         )}
 
-        <NotificationBell />
+        <NotificationBell userEmail={user?.email} companyId={activeCompany?.id} />
 
         <Button
           variant="ghost"
