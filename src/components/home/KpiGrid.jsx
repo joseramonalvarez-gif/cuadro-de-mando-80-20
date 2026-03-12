@@ -12,7 +12,7 @@ export default function KpiGrid({ kpis }) {
 
   const cards = [
     { key: 'ventas_netas', title: 'Ventas Netas', format: formatCurrency, icon: DollarSign },
-    { key: 'margen_bruto', title: 'Margen Bruto', format: (v) => formatPercent(v), icon: Percent, showCoverage: true },
+    { key: 'margen_bruto', title: 'Margen Bruto %', format: (v) => formatPercent(v), icon: Percent, showCoverage: true },
     { key: 'ebitda', title: 'EBITDA', format: formatPercent, icon: Target },
     { key: 'punto_equilibrio', title: 'Punto de Equilibrio', format: formatCurrency, icon: TrendingUp },
     { key: 'opex_ventas', title: 'OPEX % s/ Ventas', format: formatPercent, icon: Receipt },
@@ -41,9 +41,10 @@ export default function KpiGrid({ kpis }) {
         let infoText = null;
         
         if (card.showCoverage && data.cobertura !== undefined) {
-          subtitleText = `sobre ${Math.round(data.cobertura)}% de ventas`;
+          const cobPct = Math.round(data.cobertura);
+          subtitleText = cobPct < 100 ? `sobre ${cobPct}% ventas` : card.subtitle;
           if (data.cobertura < 100) {
-            infoText = `Este margen se calcula solo sobre las ${Math.round(data.cobertura)}% de ventas que tienen coste conocido. Completa los costes en Holded para mayor precisión.`;
+            infoText = `Margen calculado sobre el ${cobPct}% de ventas con coste conocido. Completa el campo "Coste" en ${Math.round(100 - data.cobertura)}% productos restantes en Holded.`;
           }
         }
         
