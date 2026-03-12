@@ -3,24 +3,88 @@ import { useApp } from '../components/shared/DemoContext';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building2, Users, Shield, Sliders, FileText, HelpCircle } from 'lucide-react';
+import { Settings, Building2, Users, Shield, Sliders, FileText, HelpCircle, BarChart3, Calendar } from 'lucide-react';
 import LoadingState from '../components/shared/LoadingState';
 import CompaniesSection from '../components/settings/CompaniesSection';
+import CostProfilesSection from '../components/settings/CostProfilesSection';
 import UsersSection from '../components/settings/UsersSection';
 import PermissionsSection from '../components/settings/PermissionsSection';
+import DataQualitySection from '../components/settings/DataQualitySection';
 import SystemParamsSection from '../components/settings/SystemParamsSection';
 import AuditSection from '../components/settings/AuditSection';
+import TaxCalendarSection from '../components/settings/TaxCalendarSection';
 import HelpSection from '../components/settings/HelpSection';
 
 export default function SettingsPage() {
-  const { user, loading: appLoading, isAdmin } = useApp();
+  const { user, companies, activeCompany, loading: appLoading, isAdmin, refreshCompanies } = useApp();
   const [activeTab, setActiveTab] = useState('companies');
+  const [users, setUsers] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   useEffect(() => {
     if (user && !isAdmin) {
       window.location.href = '/';
     }
   }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadData();
+    }
+  }, [isAdmin]);
+
+  async function loadData() {
+    try {
+      const [usersData, logsData] = await Promise.all([
+        base44.entities.User.list(),
+        base44.entities.AuditLog.filter({})
+      ]);
+      setUsers(usersData);
+      setAuditLogs(logsData.sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
+    } catch (error) {
+      console.error('Error loading settings data:', error);
+    }
+  }
+
+  async function handleUpdateCompany(companyId, updates) {
+    try {
+      await base44.entities.Company.update(companyId, updates);
+      await refreshCompanies();
+    } catch (error) {
+      console.error('Error updating company:', error);
+    }
+  }
+
+  async function handleUpdateUser(userId, updates) {
+    try {
+      await base44.entities.User.update(userId, updates);
+      await loadData();
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  }
+
+  async function handleDeleteUser(userId) {
+    try {
+      await base44.entities.User.delete(userId);
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
+  }
+
+  async function handleInviteUser(data) {
+    try {
+      await base44.users.inviteUser(data.email, data.role);
+      await loadData();
+    } catch (error) {
+      console.error('Error inviting user:', error);
+    }
+  }
+
+  function handleSavePermissions(permissions) {
+    console.log('Saving permissions:', permissions);
+  }
 
   if (appLoading) return <LoadingState />;
 
@@ -47,43 +111,76 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-6 w-full mb-6">
+        <TabsList className="grid grid-cols-4 lg:grid-cols-8 w-full mb-6">
           <TabsTrigger value="companies" className="flex items-center gap-2">
             <Building2 className="w-3.5 h-3.5" />
-            Empresas
+            <span className="hidden md:inline">Empresas</span>
+          </TabsTrigger>
+          <TabsTrigger value="cost" className="flex items-center gap-2">
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Costes</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-3.5 h-3.5" />
-            Usuarios
+            <span className="hidden md:inline">Usuarios</span>
           </TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-2">
             <Shield className="w-3.5 h-3.5" />
-            Permisos
+            <span className="hidden md:inline">Permisos</span>
+          </TabsTrigger>
+          <TabsTrigger value="quality" className="flex items-center gap-2">
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Calidad</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Sliders className="w-3.5 h-3.5" />
-            Sistema
+            <span className="hidden md:inline">IA</span>
           </TabsTrigger>
           <TabsTrigger value="audit" className="flex items-center gap-2">
             <FileText className="w-3.5 h-3.5" />
-            Auditoría
+            <span className="hidden md:inline">Auditoría</span>
           </TabsTrigger>
-          <TabsTrigger value="help" className="flex items-center gap-2">
-            <HelpCircle className="w-3.5 h-3.5" />
-            Ayuda
+          <TabsTrigger value="fiscal" className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Fiscal</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="companies">
-          <CompaniesSection />
+          <CompaniesSection 
+            companies={companies} 
+            onUpdate={handleUpdateCompany}
+          />
+        </TabsContent>
+
+        <TabsContent value="cost">
+          <CostProfilesSection 
+            company={activeCompany}
+            onUpdate={handleUpdateCompany}
+          />
         </TabsContent>
 
         <TabsContent value="users">
-          <UsersSection />
+          <UsersSection 
+            users={users}
+            onUpdate={handleUpdateUser}
+            onDelete={handleDeleteUser}
+            onInvite={handleInviteUser}
+          />
         </TabsContent>
 
         <TabsContent value="permissions">
-          <PermissionsSection />
+          <PermissionsSection 
+            modeloNegocio={activeCompany?.modelo_negocio || 'mixto'}
+            onSave={handleSavePermissions}
+          />
+        </TabsContent>
+
+        <TabsContent value="quality">
+          <DataQualitySection 
+            modeloNegocio={activeCompany?.modelo_negocio || 'mixto'}
+            quality={{}}
+          />
         </TabsContent>
 
         <TabsContent value="system">
@@ -91,11 +188,11 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="audit">
-          <AuditSection />
+          <AuditSection logs={auditLogs} />
         </TabsContent>
 
-        <TabsContent value="help">
-          <HelpSection />
+        <TabsContent value="fiscal">
+          <TaxCalendarSection />
         </TabsContent>
       </Tabs>
     </div>
