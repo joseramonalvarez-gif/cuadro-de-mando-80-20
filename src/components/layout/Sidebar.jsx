@@ -9,16 +9,16 @@ import {
 import { useApp } from '../shared/DemoContext';
 
 const NAV_ITEMS = [
-  { label: 'Dirección General', icon: LayoutDashboard, page: 'Home', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Ventas / Clientes', icon: TrendingUp, page: 'Sales', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Compras / Proveedores', icon: ShoppingCart, page: 'Purchases', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Tesorería', icon: Wallet, page: 'Treasury', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Fiscalidad', icon: FileText, page: 'Taxes', roles: ['admin', 'advanced', 'user'] },
-  { label: 'RRHH', icon: Users, page: 'HumanResources', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Producto / ABC', icon: Package, page: 'Products', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Alertas', icon: Bell, page: 'Alerts', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Chat Inteligente', icon: MessageCircle, page: 'Chat', roles: ['admin', 'advanced', 'user'] },
-  { label: 'Configuración', icon: Settings, page: 'Settings', roles: ['admin'] },
+  { label: 'Dirección General', icon: LayoutDashboard, page: 'Home', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Ventas / Clientes', icon: TrendingUp, page: 'Sales', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Compras / Proveedores', icon: ShoppingCart, page: 'Purchases', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Tesorería', icon: Wallet, page: 'Treasury', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Fiscalidad', icon: FileText, page: 'Taxes', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'RRHH / Capacidad', icon: Users, page: 'HumanResources', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['servicios', 'mixto'] },
+  { label: 'Producto / Stock', icon: Package, page: 'Products', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'mixto'] },
+  { label: 'Alertas', icon: Bell, page: 'Alerts', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Chat Inteligente', icon: MessageCircle, page: 'Chat', roles: ['admin', 'advanced', 'user'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
+  { label: 'Configuración', icon: Settings, page: 'Settings', roles: ['admin'], modeloNegocio: ['productos', 'servicios', 'mixto'] },
 ];
 
 export default function Sidebar({ collapsed, onToggle }) {
@@ -26,7 +26,10 @@ export default function Sidebar({ collapsed, onToggle }) {
   const { user, activeCompany } = useApp();
   const userRole = user?.role || 'user';
 
-  const filteredNav = NAV_ITEMS.filter(item => item.roles.includes(userRole));
+  const modeloNegocio = activeCompany?.modelo_negocio || 'mixto';
+  const filteredNav = NAV_ITEMS.filter(item => 
+    item.roles.includes(userRole) && item.modeloNegocio.includes(modeloNegocio)
+  );
 
   return (
     <aside className={`fixed left-0 top-0 h-screen bg-[#1B2731] text-white z-30 flex flex-col transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-[260px]'}`}>
