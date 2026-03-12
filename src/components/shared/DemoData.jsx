@@ -67,7 +67,7 @@ export function formatCurrency(value) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency: 'EUR',
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }

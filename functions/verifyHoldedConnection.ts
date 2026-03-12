@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const testResponse = await fetch('https://api.holded.com/api/invoicing/v1/contacts?page=1&perPage=1', {
       headers: {
         'Accept': 'application/json',
-        'Key': apiKey,
+        'key': apiKey,
       },
     });
 

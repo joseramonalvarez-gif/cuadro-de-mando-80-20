@@ -10,7 +10,7 @@ async function fetchHolded(apiKey, endpoint, retries = 0) {
     method: 'GET',
     headers: {
       'key': apiKey,
-      'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
   });
 
@@ -85,13 +85,16 @@ Deno.serve(async (req) => {
     const endpoints = [
       { type: 'invoices_sale', path: `/invoicing/v1/documents/invoice?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'invoices_purchase', path: `/invoicing/v1/documents/purchase?starttmp=${sixMonthsAgo}&endtmp=${now}` },
-      { type: 'creditnotes', path: '/invoicing/v1/documents/creditnote' },
+      { type: 'creditnotes', path: `/invoicing/v1/documents/creditnote?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'contacts', path: '/invoicing/v1/contacts' },
       { type: 'treasuries', path: '/invoicing/v1/treasuries' },
-      { type: 'payments', path: '/invoicing/v1/payments' },
+      { type: 'payments', path: `/invoicing/v1/payments?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'products', path: '/invoicing/v1/products' },
       { type: 'taxes', path: '/invoicing/v1/taxes' },
       { type: 'employees', path: '/team/v1/employees' },
+      { type: 'times', path: `/team/v1/times?starttmp=${sixMonthsAgo}&endtmp=${now}` },
+      { type: 'ledger', path: `/accounting/v1/dailyledger?starttmp=${sixMonthsAgo}&endtmp=${now}` },
+      { type: 'accounts', path: '/accounting/v1/chartofaccounts' },
     ];
 
     const results = {};
