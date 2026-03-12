@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { FileText, ShoppingCart, CreditCard, Users, RefreshCw, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { filtrarPorFechas, convertirAEUR } from '@/components/shared/kpiCalculations';
+import { filtrarPorFechas, convertirAEUR, calcularRFMQuintiles } from '@/components/shared/kpiCalculations';
 
 function calculateSalesMetrics(invoices, contacts) {
   const total = invoices.reduce((sum, inv) => 
@@ -43,11 +43,13 @@ function calculateSalesMetrics(invoices, contacts) {
 
 function calculateParetoData(invoices, contacts) {
   const clientSales = {};
-  invoices.forEach(inv => {
-    const cid = inv.contactId || 'unknown';
-    if (!clientSales[cid]) clientSales[cid] = 0;
-    clientSales[cid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
-  });
+  invoices
+    .filter(inv => inv.contactId) // Solo facturas con contacto asignado
+    .forEach(inv => {
+      const cid = inv.contactId;
+      if (!clientSales[cid]) clientSales[cid] = 0;
+      clientSales[cid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
+    });
 
   const sorted = Object.entries(clientSales)
     .map(([id, sales]) => {
@@ -81,43 +83,23 @@ function calculateParetoData(invoices, contacts) {
 }
 
 function calculateRFMData(invoices, contacts) {
-  const now = new Date();
-  const clientData = {};
-
-  invoices.forEach(inv => {
-    const cid = inv.contactId || 'unknown';
-    if (!clientData[cid]) {
-      clientData[cid] = { lastDate: new Date(inv.date), frequency: 0, total: 0 };
-    }
-    const invDate = new Date(inv.date);
-    if (invDate > clientData[cid].lastDate) clientData[cid].lastDate = invDate;
-    clientData[cid].frequency++;
-    clientData[cid].total += inv.total || 0;
-  });
-
-  return Object.entries(clientData).map(([id, data]) => {
-    const contact = contacts.find(c => c.id === id);
-    const recency = Math.floor((now - data.lastDate) / (1000 * 60 * 60 * 24));
-    const ltv = (data.total / data.frequency) * (365 / Math.max(recency, 30)) * 3;
-
-    let segment = 'new';
-    if (data.frequency >= 5 && recency <= 30) segment = 'champion';
-    else if (data.frequency >= 3 && recency <= 60) segment = 'loyal';
-    else if (data.frequency >= 2 && recency > 90) segment = 'at_risk';
-    else if (recency > 180) segment = 'lost';
-    else if (data.frequency === 1 && recency <= 60) segment = 'new';
-    else segment = 'promising';
-
-    return {
-      id,
-      name: contact?.name || 'Cliente Desconocido',
-      ultima_compra: recency,
-      frecuencia: data.frequency,
-      valor_total: data.total,
-      ltv: ltv,
-      rfm_segment: segment,
-    };
-  });
+  // Convertir formato para usar función centralizada
+  const facturasFormateadas = invoices
+    .filter(inv => inv.contactId) // Solo facturas con contacto
+    .map(inv => ({
+      contactId: inv.contactId,
+      fecha: inv.date,
+      importeNeto: inv.total || 0,
+      moneda: inv.currency || 'EUR',
+      tipoCambio: inv.currencyChange || 1
+    }));
+  
+  const contactosFormateados = contacts.map(c => ({
+    contactId: c.id,
+    nombre: c.name
+  }));
+  
+  return calcularRFMQuintiles(facturasFormateadas, contactosFormateados);
 }
 
 export default function Sales() {
@@ -260,11 +242,20 @@ export default function Sales() {
   const top80Client = paretoData.find(c => c.acumulado >= 80);
   const top80Percent = top80Client ? ((top80Client.rank / paretoData.length) * 100).toFixed(1) : '20';
 
-  const demoInvoices = [
-    { num: 'FV-2026-0142', client: 'Grupo Empresarial ABC', date: '07/03/2026', amount: 18500, status: 'Cobrada' },
-    { num: 'FV-2026-0141', client: 'Grupo Empresarial ABC', date: '05/03/2026', amount: 12300, status: 'Cobrada' },
-    { num: 'FV-2026-0140', client: 'Grupo Empresarial ABC', date: '03/03/2026', amount: 8750, status: 'Cobrada' },
-  ];
+  // Facturas reales del cliente seleccionado
+  const clientInvoices = selectedClient && !isDemo
+    ? realInvoices.filter(inv => inv.contactId === selectedClient.id).map(inv => ({
+        num: inv.docNumber || inv.number || inv.id,
+        client: selectedClient.name,
+        date: new Date(inv.date * 1000).toLocaleDateString('es-ES'),
+        amount: inv.total || 0,
+        status: inv.status === 'paid' ? 'Cobrada' : inv.status === 'sent' ? 'Enviada' : 'Pendiente'
+      }))
+    : [
+        { num: 'FV-2026-0142', client: 'Grupo Empresarial ABC', date: '07/03/2026', amount: 18500, status: 'Cobrada' },
+        { num: 'FV-2026-0141', client: 'Grupo Empresarial ABC', date: '05/03/2026', amount: 12300, status: 'Cobrada' },
+        { num: 'FV-2026-0140', client: 'Grupo Empresarial ABC', date: '03/03/2026', amount: 8750, status: 'Cobrada' },
+      ];
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -390,7 +381,7 @@ export default function Sales() {
 
       <ClientDetailModal
         client={selectedClient}
-        invoices={demoInvoices}
+        invoices={clientInvoices}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
       />

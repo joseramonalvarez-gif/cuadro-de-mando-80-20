@@ -126,6 +126,8 @@ Deno.serve(async (req) => {
       { type: 'payments', path: `/invoicing/v1/payments?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'products', path: '/invoicing/v1/products' },
       { type: 'taxes', path: '/invoicing/v1/taxes' },
+      { type: 'saleschannels', path: '/invoicing/v1/saleschannels' },
+      { type: 'warehouses', path: '/invoicing/v1/warehouses' },
       { type: 'employees', path: '/team/v1/employees' },
       { type: 'times', path: `/team/v1/times?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'ledger', path: `/accounting/v1/dailyledger?starttmp=${sixMonthsAgo}&endtmp=${now}` },

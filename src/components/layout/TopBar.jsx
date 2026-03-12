@@ -35,6 +35,19 @@ export default function TopBar({ title, onToggleSidebar }) {
       window.location.reload();
     } catch (error) {
       console.error('Sync error:', error);
+      
+      // User feedback según tipo de error
+      const errorMsg = error.message || error.toString();
+      if (errorMsg.includes('401') || errorMsg.includes('API Key inválida')) {
+        alert('⚠️ API Key inválida. Ve a Configuración para actualizarla.');
+      } else if (errorMsg.includes('403')) {
+        alert('⚠️ Sin permisos. Verifica los permisos de tu API Key en Holded.');
+      } else if (errorMsg.includes('sin API Key')) {
+        alert('⚠️ Configura tu API Key de Holded en Ajustes para sincronizar datos.');
+      } else {
+        alert(`❌ Error al sincronizar: ${errorMsg}`);
+      }
+      
       setSyncing(false);
     }
   }

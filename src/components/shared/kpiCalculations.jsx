@@ -173,3 +173,215 @@ export function calcularVentasNetas(lineasVenta, creditNotes = []) {
   
   return ventasBrutas - devoluciones;
 }
+
+/**
+ * Calcula saldo de IVA (repercutido - soportado)
+ */
+export function calcularSaldoIVA(lineasVenta, lineasCompra, impuestos) {
+  let ivaRepercutido = 0;
+  let ivaSoportado = 0;
+  
+  // IVA de ventas (repercutido)
+  lineasVenta.forEach(linea => {
+    const impuesto = impuestos.find(tax => tax.id === linea.impuestoId);
+    if (impuesto && impuesto.value) {
+      const subtotalEUR = convertirAEUR(linea.importeNeto || 0, linea.moneda, linea.tipoCambio);
+      const cuotaIVA = subtotalEUR * (impuesto.value / 100);
+      ivaRepercutido += cuotaIVA;
+    }
+  });
+  
+  // IVA de compras (soportado)
+  lineasCompra.forEach(linea => {
+    const impuesto = impuestos.find(tax => tax.id === linea.impuestoId);
+    if (impuesto && impuesto.value) {
+      const subtotalEUR = convertirAEUR(linea.importeNeto || 0, linea.moneda, linea.tipoCambio);
+      const cuotaIVA = subtotalEUR * (impuesto.value / 100);
+      ivaSoportado += cuotaIVA;
+    }
+  });
+  
+  return {
+    ivaRepercutido,
+    ivaSoportado,
+    saldoIVA: ivaRepercutido - ivaSoportado
+  };
+}
+
+/**
+ * Calcula previsión de tesorería real basada en facturas pendientes
+ */
+export function calcularPrevisionTesoreria(facturas, saldoActual, diasPrevision = 30) {
+  const hoy = new Date();
+  const proyeccion = [];
+  
+  // Agrupar por semana
+  for (let dia = 0; dia <= diasPrevision; dia += 7) {
+    const fechaInicio = new Date(hoy);
+    fechaInicio.setDate(fechaInicio.getDate() + dia);
+    const fechaFin = new Date(fechaInicio);
+    fechaFin.setDate(fechaFin.getDate() + 7);
+    
+    const facturasRango = facturas.filter(f => {
+      if (!f.fechaVencimiento || f.estadoPago === 'paid') return false;
+      const vto = new Date(f.fechaVencimiento * 1000);
+      return vto >= fechaInicio && vto < fechaFin;
+    });
+    
+    const entradas = facturasRango
+      .filter(f => f.tipo === 'invoice')
+      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || 0, f.moneda, f.tipoCambio), 0);
+    
+    const salidas = facturasRango
+      .filter(f => f.tipo === 'purchase')
+      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || 0, f.moneda, f.tipoCambio), 0);
+    
+    saldoActual = saldoActual + entradas - salidas;
+    
+    proyeccion.push({
+      fecha: `${fechaInicio.getDate()}/${fechaInicio.getMonth() + 1}`,
+      entradas,
+      salidas,
+      saldo: saldoActual
+    });
+  }
+  
+  return proyeccion;
+}
+
+/**
+ * Calcula score de calidad de dato
+ */
+export function calcularCalidadDato(facturas, lineasVenta, productos) {
+  const totalFacturas = facturas.length;
+  const facturasConContacto = facturas.filter(f => f.contactId || f.clienteId).length;
+  
+  const totalLineas = lineasVenta.length;
+  const lineasConProducto = lineasVenta.filter(l => l.itemId || l.productoId).length;
+  
+  const totalProductos = productos.length;
+  const productosConCoste = productos.filter(p => p.coste > 0 || p.cost > 0).length;
+  
+  const scoreContacto = totalFacturas > 0 ? (facturasConContacto / totalFacturas) * 100 : 100;
+  const scoreProducto = totalLineas > 0 ? (lineasConProducto / totalLineas) * 100 : 100;
+  const scoreCoste = totalProductos > 0 ? (productosConCoste / totalProductos) * 100 : 0;
+  
+  const scoreGlobal = (scoreContacto + scoreProducto + scoreCoste) / 3;
+  
+  return {
+    scoreGlobal,
+    scoreContacto,
+    scoreProducto,
+    scoreCoste,
+    semaforo: scoreGlobal >= 85 ? 'verde' : scoreGlobal >= 70 ? 'amarillo' : 'rojo',
+    detalles: {
+      facturasConContacto,
+      totalFacturas,
+      lineasConProducto,
+      totalLineas,
+      productosConCoste,
+      totalProductos
+    }
+  };
+}
+
+/**
+ * Calcula RFM con quintiles estadísticos
+ */
+export function calcularRFMQuintiles(facturas, contactos) {
+  const hoy = new Date();
+  const clienteData = {};
+  
+  // 1. Calcular R, F, M por cliente
+  facturas.forEach(inv => {
+    const cid = inv.contactId || inv.clienteId;
+    if (!cid) return;
+    
+    const fecha = new Date(inv.fecha * 1000 || inv.date * 1000);
+    const importe = convertirAEUR(inv.importeNeto || inv.total || 0, inv.moneda, inv.tipoCambio);
+    
+    if (!clienteData[cid]) {
+      clienteData[cid] = { ultimaFecha: fecha, frecuencia: 0, totalGastado: 0 };
+    }
+    
+    if (fecha > clienteData[cid].ultimaFecha) {
+      clienteData[cid].ultimaFecha = fecha;
+    }
+    clienteData[cid].frecuencia++;
+    clienteData[cid].totalGastado += importe;
+  });
+  
+  // 2. Calcular días desde última compra
+  const clientesArray = Object.entries(clienteData).map(([id, data]) => {
+    const diasDesdeUltima = Math.floor((hoy - data.ultimaFecha) / (1000 * 60 * 60 * 24));
+    return {
+      clienteId: id,
+      recency: diasDesdeUltima,
+      frequency: data.frecuencia,
+      monetary: data.totalGastado
+    };
+  });
+  
+  // 3. Calcular quintiles (percentiles 20, 40, 60, 80)
+  const calcularQuintiles = (valores) => {
+    const sorted = [...valores].sort((a, b) => a - b);
+    return {
+      q1: sorted[Math.floor(sorted.length * 0.2)],
+      q2: sorted[Math.floor(sorted.length * 0.4)],
+      q3: sorted[Math.floor(sorted.length * 0.6)],
+      q4: sorted[Math.floor(sorted.length * 0.8)]
+    };
+  };
+  
+  const quintilesR = calcularQuintiles(clientesArray.map(c => c.recency));
+  const quintilesF = calcularQuintiles(clientesArray.map(c => c.frequency));
+  const quintilesM = calcularQuintiles(clientesArray.map(c => c.monetary));
+  
+  // 4. Asignar scores
+  return clientesArray.map(cliente => {
+    // Recency: menor es mejor (invertir)
+    let scoreR = 5;
+    if (cliente.recency > quintilesR.q4) scoreR = 1;
+    else if (cliente.recency > quintilesR.q3) scoreR = 2;
+    else if (cliente.recency > quintilesR.q2) scoreR = 3;
+    else if (cliente.recency > quintilesR.q1) scoreR = 4;
+    
+    // Frequency: mayor es mejor
+    let scoreF = 1;
+    if (cliente.frequency > quintilesF.q4) scoreF = 5;
+    else if (cliente.frequency > quintilesF.q3) scoreF = 4;
+    else if (cliente.frequency > quintilesF.q2) scoreF = 3;
+    else if (cliente.frequency > quintilesF.q1) scoreF = 2;
+    
+    // Monetary: mayor es mejor
+    let scoreM = 1;
+    if (cliente.monetary > quintilesM.q4) scoreM = 5;
+    else if (cliente.monetary > quintilesM.q3) scoreM = 4;
+    else if (cliente.monetary > quintilesM.q2) scoreM = 3;
+    else if (cliente.monetary > quintilesM.q1) scoreM = 2;
+    
+    // Segmentación
+    let segmento = 'en_riesgo';
+    if (scoreR >= 4 && scoreF >= 4) segmento = 'champion';
+    else if (scoreR >= 3 && scoreF >= 3) segmento = 'loyal';
+    else if (scoreR <= 2 && scoreF >= 3) segmento = 'at_risk';
+    else if (scoreR <= 2) segmento = 'lost';
+    else if (scoreF === 1) segmento = 'new';
+    else segmento = 'promising';
+    
+    const contacto = contactos.find(c => c.contactId === cliente.clienteId || c.id === cliente.clienteId);
+    
+    return {
+      ...cliente,
+      nombre: contacto?.nombre || contacto?.name || 'Desconocido',
+      scoreR,
+      scoreF,
+      scoreM,
+      rfm_segment: segmento,
+      ultima_compra: cliente.recency,
+      frecuencia: cliente.frequency,
+      valor_total: cliente.monetary,
+      ltv: cliente.monetary * (365 / Math.max(cliente.recency, 30)) * 2
+    };
+  });
+}
