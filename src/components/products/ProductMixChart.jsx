@@ -1,45 +1,84 @@
 import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-
-const FAMILY_COLORS = ['#33A19A', '#5BB8B2', '#B7CAC9', '#E8EEEE', '#F8F6F1', '#3E4C59'];
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const CustomTooltip = ({ active, payload }) => {
-  if (!active || !payload || !payload[0]) return null;
+  if (!active || !payload?.length) return null;
+  
   const data = payload[0].payload;
-  const fmt = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
   return (
-    <div className="bg-white border border-[#E8EEEE] rounded-lg shadow-lg p-3 text-xs">
-      <p className="font-medium text-[#1B2731] mb-1">{data.name}</p>
-      <p className="text-[#3E4C59]">Ventas: {fmt(data.value)}</p>
-      <p className="font-semibold text-[#33A19A]">{data.percent.toFixed(1)}% del total</p>
+    <div className="bg-white border border-[#B7CAC9] rounded-lg p-3 shadow-lg">
+      <p className="font-semibold text-[#1B2731] mb-2">{data.item}</p>
+      <p className="text-sm text-[#3E4C59]">
+        Ventas: {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(data.ventas)}
+      </p>
+      <p className="text-sm text-[#3E4C59]">
+        Margen: {data.margenPct.toFixed(1)}%
+      </p>
+      <p className="text-sm text-[#3E4C59]">
+        Clientes: {data.numClientes}
+      </p>
+      <p className="text-sm font-semibold" style={{ color: data.color }}>
+        {data.categoria}
+      </p>
     </div>
   );
 };
 
 export default function ProductMixChart({ data }) {
+  const categorias = {
+    'Estrella': { color: '#33A19A', label: 'Alto volumen + Alto margen' },
+    'Gancho': { color: '#E6A817', label: 'Alto volumen + Bajo margen' },
+    'Potencial': { color: '#3E8CDD', label: 'Bajo volumen + Alto margen' },
+    'Revisar': { color: '#E05252', label: 'Bajo volumen + Bajo margen' }
+  };
+
+  const chartData = data.map(item => ({
+    ...item,
+    color: categorias[item.categoria]?.color || '#B7CAC9'
+  }));
+
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60">
-      <h3 className="text-sm font-semibold text-[#1B2731] font-['Space_Grotesk'] mb-4">Mix de Ventas por Familia</h3>
-      <div className="h-[280px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={90}
-              label={(entry) => `${entry.name}: ${entry.percent.toFixed(1)}%`}
-              labelLine={true}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={FAMILY_COLORS[index % FAMILY_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
+    <div className="bg-white rounded-xl border border-[#E8EEEE] p-6">
+      <h3 className="text-lg font-semibold text-[#1B2731] font-['Space_Grotesk'] mb-4">
+        Matriz Volumen × Margen
+      </h3>
+
+      <ResponsiveContainer width="100%" height={400}>
+        <ScatterChart>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E8EEEE" />
+          <XAxis 
+            type="number" 
+            dataKey="ventas" 
+            name="Ventas"
+            tick={{ fontSize: 11, fill: '#3E4C59' }}
+            tickFormatter={(val) => `${(val / 1000).toFixed(0)}k€`}
+          />
+          <YAxis 
+            type="number" 
+            dataKey="margenPct" 
+            name="Margen %"
+            tick={{ fontSize: 11, fill: '#3E4C59' }}
+            tickFormatter={(val) => `${val}%`}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Scatter data={chartData} dataKey="numClientes">
+            {chartData.map((entry, index) => (
+              <Cell key={index} fill={entry.color} />
+            ))}
+          </Scatter>
+        </ScatterChart>
+      </ResponsiveContainer>
+
+      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        {Object.entries(categorias).map(([cat, info]) => (
+          <div key={cat} className="border border-[#E8EEEE] rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: info.color }}></div>
+              <span className="text-sm font-semibold text-[#1B2731]">{cat}</span>
+            </div>
+            <p className="text-xs text-[#3E4C59]">{info.label}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

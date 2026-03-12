@@ -1,57 +1,53 @@
 import React from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import DateFilter from '../shared/DateFilter';
-import { Download, Bell, Bookmark } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Calendar, Filter } from 'lucide-react';
 
-export default function HRFilters({ filters, onFilterChange, onExport, onCreateAlert, onSaveView, isAdmin, isAdvanced, departments, employees }) {
+export default function HRFilters({ filters, onFiltersChange }) {
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 mb-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <DateFilter onDateChange={(range) => onFilterChange({ ...filters, dateRange: range })} />
-        
-        <Select value={filters.department} onValueChange={(v) => onFilterChange({ ...filters, department: v })}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Departamento" />
+    <div className="bg-white rounded-xl border border-[#E8EEEE] p-4">
+      <div className="flex flex-wrap gap-3">
+        <Select 
+          value={filters.periodo} 
+          onValueChange={(val) => onFiltersChange({ ...filters, periodo: val })}
+        >
+          <SelectTrigger className="w-[140px]">
+            <Calendar className="w-4 h-4 mr-2" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {departments.map((dept, i) => (
-              <SelectItem key={i} value={dept}>{dept}</SelectItem>
-            ))}
+            <SelectItem value="mes">Este mes</SelectItem>
+            <SelectItem value="trimestre">Este trimestre</SelectItem>
+            <SelectItem value="año">Este año</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={filters.employee} onValueChange={(v) => onFilterChange({ ...filters, employee: v })}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Empleado" />
+        <Select 
+          value={filters.perfil} 
+          onValueChange={(val) => onFiltersChange({ ...filters, perfil: val })}
+        >
+          <SelectTrigger className="w-[160px]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los empleados</SelectItem>
-            {employees.map((emp, i) => (
-              <SelectItem key={i} value={emp.id || emp.name}>{emp.name}</SelectItem>
-            ))}
+            <SelectItem value="all">Todos los perfiles</SelectItem>
+            <SelectItem value="senior">Senior</SelectItem>
+            <SelectItem value="junior">Junior</SelectItem>
+            <SelectItem value="manager">Manager</SelectItem>
           </SelectContent>
         </Select>
 
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" onClick={onSaveView}>
-            <Bookmark className="w-4 h-4 mr-2" />
-            Guardar
-          </Button>
-          {(isAdmin || isAdvanced) && (
-            <>
-              <Button variant="outline" size="sm" onClick={onCreateAlert}>
-                <Bell className="w-4 h-4 mr-2" />
-                Alerta
-              </Button>
-              <Button variant="outline" size="sm" onClick={onExport}>
-                <Download className="w-4 h-4 mr-2" />
-                Exportar
-              </Button>
-            </>
-          )}
-        </div>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => onFiltersChange({
+            periodo: 'mes',
+            perfil: 'all'
+          })}
+        >
+          Resetear
+        </Button>
       </div>
     </div>
   );
