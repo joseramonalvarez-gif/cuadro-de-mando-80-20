@@ -14,9 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ShoppingBag, FileText, CreditCard, Users, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { filtrarPorFechas, convertirAEUR } from '@/components/shared/kpiCalculations';
 
 function calculatePurchaseMetrics(invoices, contacts) {
-  const total = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const total = invoices.reduce((sum, inv) => 
+    sum + convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange), 0
+  );
   const count = invoices.length;
   const avgTicket = count > 0 ? total / count : 0;
   
@@ -45,7 +48,7 @@ function calculateParetoData(invoices, contacts) {
   invoices.forEach(inv => {
     const sid = inv.contactId || 'unknown';
     if (!supplierPurchases[sid]) supplierPurchases[sid] = 0;
-    supplierPurchases[sid] += inv.total || 0;
+    supplierPurchases[sid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
   });
 
   const sorted = Object.entries(supplierPurchases)
@@ -151,8 +154,9 @@ export default function Purchases() {
         dpo: { value: 38, prev: 41, trend: -7.3, status: 'green' },
       };
     }
-    return calculatePurchaseMetrics(realInvoices, realContacts);
-  }, [isDemo, realInvoices, realContacts]);
+    const filtered = filtrarPorFechas(realInvoices, filters.dateRange, 'date');
+    return calculatePurchaseMetrics(filtered, realContacts);
+  }, [isDemo, realInvoices, realContacts, filters.dateRange]);
 
   const paretoData = useMemo(() => {
     if (isDemo) {
@@ -179,8 +183,9 @@ export default function Purchases() {
         };
       });
     }
-    return calculateParetoData(realInvoices, realContacts);
-  }, [isDemo, realInvoices, realContacts, demoData]);
+    const filtered = filtrarPorFechas(realInvoices, filters.dateRange, 'date');
+    return calculateParetoData(filtered, realContacts);
+  }, [isDemo, realInvoices, realContacts, demoData, filters.dateRange]);
 
   const priceEvolution = useMemo(() => calculatePriceEvolution(), []);
   const marginData = useMemo(() => calculateMarginData(paretoData), [paretoData]);

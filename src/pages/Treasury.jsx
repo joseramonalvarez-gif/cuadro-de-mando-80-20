@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowDownCircle, ArrowUpCircle, TrendingUp, Clock, Activity } from 'lucide-react';
 import { toast } from 'sonner';
+import { filtrarPorFechas, convertirAEUR, calcularAging } from '@/components/shared/kpiCalculations';
 
 function calculateTreasuryMetrics(treasuries, payments, invoicesSale, invoicesPurchase) {
   const totalBalance = treasuries.reduce((sum, t) => sum + (t.balance || 0), 0);
@@ -189,8 +190,11 @@ export default function Treasury() {
         ccc: { value: 31, prev: 36, trend: -13.9, status: 'green' },
       };
     }
-    return calculateTreasuryMetrics(realTreasuries, realPayments, realInvoicesSale, realInvoicesPurchase);
-  }, [isDemo, realTreasuries, realPayments, realInvoicesSale, realInvoicesPurchase]);
+    const filteredPayments = filtrarPorFechas(realPayments, filters.dateRange, 'date');
+    const filteredSales = filtrarPorFechas(realInvoicesSale, filters.dateRange, 'date');
+    const filteredPurchases = filtrarPorFechas(realInvoicesPurchase, filters.dateRange, 'date');
+    return calculateTreasuryMetrics(realTreasuries, filteredPayments, filteredSales, filteredPurchases);
+  }, [isDemo, realTreasuries, realPayments, realInvoicesSale, realInvoicesPurchase, filters.dateRange]);
 
   const forecastData = useMemo(() => {
     const period = parseInt(filters.forecastPeriod);

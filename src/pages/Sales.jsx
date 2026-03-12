@@ -13,9 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { FileText, ShoppingCart, CreditCard, Users, RefreshCw, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { filtrarPorFechas, convertirAEUR } from '@/components/shared/kpiCalculations';
 
 function calculateSalesMetrics(invoices, contacts) {
-  const total = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const total = invoices.reduce((sum, inv) => 
+    sum + convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange), 0
+  );
   const count = invoices.length;
   const avgTicket = count > 0 ? total / count : 0;
   
@@ -23,7 +26,9 @@ function calculateSalesMetrics(invoices, contacts) {
   const activeClients = clientIds.size;
 
   const creditNotes = invoices.filter(inv => inv.type === 'creditnote');
-  const returns = creditNotes.reduce((sum, cn) => sum + (cn.total || 0), 0);
+  const returns = creditNotes.reduce((sum, cn) => 
+    sum + convertirAEUR(cn.total || 0, cn.currency, cn.currencyChange), 0
+  );
   const returnsPercent = total > 0 ? (returns / total) * 100 : 0;
 
   return {
@@ -41,7 +46,7 @@ function calculateParetoData(invoices, contacts) {
   invoices.forEach(inv => {
     const cid = inv.contactId || 'unknown';
     if (!clientSales[cid]) clientSales[cid] = 0;
-    clientSales[cid] += inv.total || 0;
+    clientSales[cid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
   });
 
   const sorted = Object.entries(clientSales)
@@ -168,8 +173,9 @@ export default function Sales() {
         devoluciones: { value: 8920, percent: 1.8, prev: 10650, trend: -16.2, status: 'green' },
       };
     }
-    return calculateSalesMetrics(realInvoices, realContacts);
-  }, [isDemo, realInvoices, realContacts, demoData]);
+    const filtered = filtrarPorFechas(realInvoices, filters.dateRange, 'date');
+    return calculateSalesMetrics(filtered, realContacts);
+  }, [isDemo, realInvoices, realContacts, demoData, filters.dateRange]);
 
   const paretoData = useMemo(() => {
     if (isDemo) {
@@ -194,8 +200,9 @@ export default function Sales() {
         };
       });
     }
-    return calculateParetoData(realInvoices, realContacts);
-  }, [isDemo, realInvoices, realContacts, demoData]);
+    const filtered = filtrarPorFechas(realInvoices, filters.dateRange, 'date');
+    return calculateParetoData(filtered, realContacts);
+  }, [isDemo, realInvoices, realContacts, demoData, filters.dateRange]);
 
   const rfmData = useMemo(() => {
     if (isDemo) {
@@ -207,8 +214,9 @@ export default function Sales() {
         { id: '5', name: 'Digital Solutions Spain', ultima_compra: 210, frecuencia: 3, valor_total: 38700, ltv: 19350, rfm_segment: 'lost' },
       ];
     }
-    return calculateRFMData(realInvoices, realContacts);
-  }, [isDemo, realInvoices, realContacts]);
+    const filtered = filtrarPorFechas(realInvoices, filters.dateRange, 'date');
+    return calculateRFMData(filtered, realContacts);
+  }, [isDemo, realInvoices, realContacts, filters.dateRange]);
 
   const filteredPareto = useMemo(() => {
     let data = [...paretoData];

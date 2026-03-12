@@ -41,7 +41,8 @@ export default function DateFilter({ onDateChange, compact = false }) {
     setActivePreset(key);
     if (key !== 'custom') {
       const range = getRange(key);
-      onDateChange?.(range);
+      const rangeWithStart = range.from ? { start: range.from, end: range.to } : null;
+      onDateChange?.(rangeWithStart);
       setOpen(false);
     }
   }
@@ -49,7 +50,9 @@ export default function DateFilter({ onDateChange, compact = false }) {
   function handleCustom(range) {
     setCustomRange(range);
     if (range?.from && range?.to) {
-      onDateChange?.(range);
+      const rangeWithStart = { start: range.from, end: range.to };
+      onDateChange?.(rangeWithStart);
+      setOpen(false);
     }
   }
 
