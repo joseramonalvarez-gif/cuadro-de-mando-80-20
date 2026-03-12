@@ -33,9 +33,9 @@ export default function TreasuryFilters({ filters, onFiltersChange, cuentas }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las cuentas</SelectItem>
-            {cuentas.map(c => (
-              <SelectItem key={c.cuentaId} value={c.cuentaId}>
-                {c.nombre}
+            {cuentas?.map(c => (
+              <SelectItem key={c.cuentaId || c.id} value={c.cuentaId || c.id}>
+                {c.nombre || c.name}
               </SelectItem>
             ))}
           </SelectContent>
