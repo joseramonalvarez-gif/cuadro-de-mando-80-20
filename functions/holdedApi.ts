@@ -29,21 +29,28 @@ async function fetchHolded(apiKey, endpoint, retries = 0) {
 }
 
 Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  
-  if (!user) {
-    return Response.json({ error: 'No autenticado' }, { status: 401 });
-  }
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    
+    if (!user) {
+      return Response.json({ error: 'No autenticado' }, { status: 401 });
+    }
 
-  const body = await req.json();
-  const { action, companyId, company_id, endpoint, params } = body;
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return Response.json({ error: 'Body JSON inválido' }, { status: 400 });
+    }
 
-  const finalCompanyId = companyId || company_id;
+    const { action, companyId, company_id, endpoint, params } = body;
 
-  if (!finalCompanyId) {
-    return Response.json({ error: 'companyId requerido' }, { status: 400 });
-  }
+    const finalCompanyId = companyId || company_id;
+
+    if (!finalCompanyId) {
+      return Response.json({ error: 'companyId requerido' }, { status: 400 });
+    }
 
   // Get company and API key (service role to access the key)
   const companies = await base44.asServiceRole.entities.Company.filter({ id: finalCompanyId });
@@ -56,28 +63,32 @@ Deno.serve(async (req) => {
   const apiKey = company.holded_api_key;
   const startTime = Date.now();
 
-  if (action === 'fetch') {
-    const data = await fetchHolded(apiKey, endpoint);
-    const elapsed = Date.now() - startTime;
+    if (action === 'fetch') {
+      if (!endpoint) {
+        return Response.json({ error: 'endpoint requerido para action=fetch' }, { status: 400 });
+      }
 
-    // Log the API call
-    await base44.asServiceRole.entities.ApiLog.create({
-      company_id: finalCompanyId,
-      endpoint,
-      method: 'GET',
-      status_code: 200,
-      response_time_ms: elapsed,
-      records_fetched: Array.isArray(data) ? data.length : 1,
-    });
+      const data = await fetchHolded(apiKey, endpoint);
+      const elapsed = Date.now() - startTime;
 
-    return Response.json({ data, records: Array.isArray(data) ? data.length : 1 });
-  }
+      // Log the API call
+      await base44.asServiceRole.entities.ApiLog.create({
+        company_id: finalCompanyId,
+        endpoint,
+        method: 'GET',
+        status_code: 200,
+        response_time_ms: elapsed,
+        records_fetched: Array.isArray(data) ? data.length : 1,
+      });
 
-  if (action === 'sync_all') {
-    // Only admin can trigger full sync
-    if (user.role !== 'admin') {
-      return Response.json({ error: 'Solo administradores pueden sincronizar' }, { status: 403 });
+      return Response.json({ success: true, data, records: Array.isArray(data) ? data.length : 1 });
     }
+
+    if (action === 'sync_all') {
+      // Only admin can trigger full sync
+      if (user.role !== 'admin') {
+        return Response.json({ error: 'Solo administradores pueden sincronizar' }, { status: 403 });
+      }
 
     const now = Math.floor(Date.now() / 1000);
     const sixMonthsAgo = now - (180 * 24 * 60 * 60);
@@ -143,8 +154,15 @@ Deno.serve(async (req) => {
       is_demo: false,
     });
 
-    return Response.json({ success: true, results });
-  }
+      return Response.json({ success: true, results });
+    }
 
-  return Response.json({ error: 'Acción no válida' }, { status: 400 });
+    return Response.json({ error: 'Acción no válida' }, { status: 400 });
+  } catch (error) {
+    console.error('holdedApi error:', error);
+    return Response.json({ 
+      error: error.message || 'Error interno del servidor',
+      details: error.toString()
+    }, { status: 500 });
+  }
 });
