@@ -1,125 +1,112 @@
 import React, { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { base44 } from '@/api/base44Client';
-import { useApp } from '../shared/DemoContext';
-import { formatCurrency } from '../shared/DemoData';
 
-export default function NotificationBell() {
-  const { activeCompany, user } = useApp();
-  const [logs, setLogs] = useState([]);
+export default function NotificationBell({ userEmail, companyId }) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (activeCompany) {
-      loadAlertLogs();
+    if (companyId) {
+      loadNotifications();
     }
-  }, [activeCompany]);
+  }, [companyId]);
 
-  async function loadAlertLogs() {
-    const allLogs = await base44.entities.AlertLog.filter({
-      company_id: activeCompany.id,
-    }, '-created_date', 20);
-    
-    setLogs(allLogs);
-    const unread = allLogs.filter(log => !(log.read_by || []).includes(user.email)).length;
-    setUnreadCount(unread);
+  async function loadNotifications() {
+    try {
+      const logs = await base44.entities.AlertLog.filter({ 
+        company_id: companyId 
+      });
+
+      const unread = logs.filter(log => !log.read_by?.includes(userEmail));
+      setUnreadCount(unread.length);
+      setNotifications(logs.slice(0, 10)); // Últimas 10
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
   }
 
   async function markAsRead(logId) {
-    const log = logs.find(l => l.id === logId);
-    if (!log) return;
-    
-    const readBy = [...(log.read_by || []), user.email];
-    await base44.entities.AlertLog.update(logId, { read_by: readBy });
-    loadAlertLogs();
-  }
-
-  async function markAllAsRead() {
-    for (const log of logs) {
-      if (!(log.read_by || []).includes(user.email)) {
-        const readBy = [...(log.read_by || []), user.email];
-        await base44.entities.AlertLog.update(log.id, { read_by: readBy });
+    try {
+      const log = notifications.find(n => n.id === logId);
+      const readBy = log.read_by || [];
+      
+      if (!readBy.includes(userEmail)) {
+        await base44.entities.AlertLog.update(logId, {
+          read_by: [...readBy, userEmail]
+        });
+        
+        await loadNotifications();
       }
+    } catch (error) {
+      console.error('Error marking as read:', error);
     }
-    loadAlertLogs();
   }
 
-  function formatValue(value, kpi) {
-    if (kpi.includes('saldo') || kpi.includes('cash') || kpi.includes('coste') || kpi.includes('ventas')) {
-      return formatCurrency(value);
-    }
-    if (kpi.includes('margen') || kpi.includes('peso') || kpi.includes('absentismo') || kpi.includes('tasa')) {
-      return `${value.toFixed(1)}%`;
-    }
-    return value.toFixed(0);
-  }
-
-  function getTimeAgo(dateStr) {
-    const date = new Date(dateStr);
+  const formatDate = (date) => {
+    const d = new Date(date);
     const now = new Date();
-    const diff = Math.floor((now - date) / 1000);
-    
-    if (diff < 60) return 'Ahora';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return `${Math.floor(diff / 86400)}d`;
-  }
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `Hace ${diffMins}min`;
+    if (diffHours < 24) return `Hace ${diffHours}h`;
+    return `Hace ${diffDays}d`;
+  };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5 text-[#3E4C59]" />
+          <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 bg-red-500 text-white text-xs">
+            <Badge className="absolute -top-1 -right-1 bg-[#E05252] text-white px-1.5 py-0.5 text-xs">
               {unreadCount}
             </Badge>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0" align="end">
-        <div className="border-b border-[#E8EEEE] p-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[#1B2731]">Notificaciones</h3>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs text-[#33A19A]">
-              Marcar todas leídas
-            </Button>
-          )}
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="p-4 border-b border-[#E8EEEE]">
+          <h4 className="font-semibold text-[#1B2731]">Notificaciones</h4>
         </div>
-        
         <div className="max-h-96 overflow-y-auto">
-          {logs.length === 0 ? (
-            <div className="p-8 text-center text-[#B7CAC9] text-sm">
+          {notifications.length === 0 ? (
+            <div className="p-8 text-center text-[#B7CAC9]">
               No hay notificaciones
             </div>
           ) : (
-            logs.map((log, i) => {
-              const isRead = (log.read_by || []).includes(user.email);
+            notifications.map((notif) => {
+              const isRead = notif.read_by?.includes(userEmail);
               return (
                 <div
-                  key={i}
-                  className={`p-3 border-b border-[#E8EEEE] hover:bg-[#FDFBF7] cursor-pointer ${!isRead ? 'bg-[#F8F6F1]' : ''}`}
-                  onClick={() => !isRead && markAsRead(log.id)}
+                  key={notif.id}
+                  className={`p-4 border-b border-[#E8EEEE] hover:bg-[#F0F5F5] cursor-pointer ${
+                    !isRead ? 'bg-[#FFFAF3]' : ''
+                  }`}
+                  onClick={() => markAsRead(notif.id)}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 ${
+                      notif.severity === 'red' ? 'bg-[#E05252]' : 'bg-[#E6A817]'
+                    }`}></div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge className={`${log.severity === 'red' ? 'bg-red-500' : 'bg-amber-500'} text-white text-xs`}>
-                          {log.severity === 'red' ? 'Crítico' : 'Aviso'}
-                        </Badge>
-                        <span className="text-xs text-[#B7CAC9]">{getTimeAgo(log.created_date)}</span>
-                      </div>
-                      <p className="text-sm font-medium text-[#1B2731] mb-1">{log.kpi_label}</p>
-                      <p className="text-xs text-[#3E4C59]">
-                        Valor: {formatValue(log.triggered_value, log.kpi_name)} • Umbral: {formatValue(log.threshold, log.kpi_name)}
+                      <p className="font-medium text-[#1B2731] text-sm">
+                        {notif.kpi_label}
+                      </p>
+                      <p className="text-sm text-[#3E4C59] mt-1">
+                        Valor: <strong>{notif.triggered_value}</strong>
+                      </p>
+                      <p className="text-xs text-[#B7CAC9] mt-1">
+                        {formatDate(notif.created_date)}
                       </p>
                     </div>
-                    {!isRead && (
-                      <div className="w-2 h-2 rounded-full bg-[#33A19A] mt-1" />
-                    )}
                   </div>
                 </div>
               );
