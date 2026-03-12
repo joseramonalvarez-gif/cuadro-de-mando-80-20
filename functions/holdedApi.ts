@@ -110,42 +110,57 @@ Deno.serve(async (req) => {
 
     const results = {};
     for (const ep of endpoints) {
-      const epStart = Date.now();
-      const data = await fetchHolded(apiKey, ep.path);
-      const elapsed = Date.now() - epStart;
+      try {
+        const epStart = Date.now();
+        const data = await fetchHolded(apiKey, ep.path);
+        const elapsed = Date.now() - epStart;
 
-      // Cache the data
-      const existing = await base44.asServiceRole.entities.CachedData.filter({
-        company_id: finalCompanyId,
-        data_type: ep.type,
-      });
-
-      if (existing.length > 0) {
-        await base44.asServiceRole.entities.CachedData.update(existing[0].id, {
-          data: { items: Array.isArray(data) ? data : [data] },
-          last_fetched: new Date().toISOString(),
-          last_timestamp: now,
-        });
-      } else {
-        await base44.asServiceRole.entities.CachedData.create({
+        // Cache the data
+        const existing = await base44.asServiceRole.entities.CachedData.filter({
           company_id: finalCompanyId,
           data_type: ep.type,
-          data: { items: Array.isArray(data) ? data : [data] },
-          last_fetched: new Date().toISOString(),
-          last_timestamp: now,
+        });
+
+        if (existing.length > 0) {
+          await base44.asServiceRole.entities.CachedData.update(existing[0].id, {
+            data: { items: Array.isArray(data) ? data : [data] },
+            last_fetched: new Date().toISOString(),
+            last_timestamp: now,
+          });
+        } else {
+          await base44.asServiceRole.entities.CachedData.create({
+            company_id: finalCompanyId,
+            data_type: ep.type,
+            data: { items: Array.isArray(data) ? data : [data] },
+            last_fetched: new Date().toISOString(),
+            last_timestamp: now,
+          });
+        }
+
+        await base44.asServiceRole.entities.ApiLog.create({
+          company_id: finalCompanyId,
+          endpoint: ep.path,
+          method: 'GET',
+          status_code: 200,
+          response_time_ms: elapsed,
+          records_fetched: Array.isArray(data) ? data.length : 1,
+        });
+
+        results[ep.type] = Array.isArray(data) ? data.length : 1;
+      } catch (error) {
+        console.error(`Error syncing ${ep.type}:`, error.message);
+        results[ep.type] = { error: error.message };
+        
+        // Log the error
+        await base44.asServiceRole.entities.ApiLog.create({
+          company_id: finalCompanyId,
+          endpoint: ep.path,
+          method: 'GET',
+          status_code: 500,
+          response_time_ms: 0,
+          error_message: error.message,
         });
       }
-
-      await base44.asServiceRole.entities.ApiLog.create({
-        company_id: finalCompanyId,
-        endpoint: ep.path,
-        method: 'GET',
-        status_code: 200,
-        response_time_ms: elapsed,
-        records_fetched: Array.isArray(data) ? data.length : 1,
-      });
-
-      results[ep.type] = Array.isArray(data) ? data.length : 1;
     }
 
     // Update company last sync date
