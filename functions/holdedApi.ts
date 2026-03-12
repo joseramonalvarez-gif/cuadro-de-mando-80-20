@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       { type: 'invoices_purchase', path: `/invoicing/v1/documents/purchase?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'creditnotes', path: `/invoicing/v1/documents/creditnote?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'contacts', path: '/invoicing/v1/contacts' },
-      { type: 'treasuries', path: '/invoicing/v1/treasuries' },
+      { type: 'treasuries', path: '/treasury/v1/treasury' },
       { type: 'payments', path: `/invoicing/v1/payments?starttmp=${sixMonthsAgo}&endtmp=${now}` },
       { type: 'products', path: '/invoicing/v1/products' },
       { type: 'taxes', path: '/invoicing/v1/taxes' },
