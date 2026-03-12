@@ -9,13 +9,33 @@ import { es } from 'date-fns/locale';
 import NotificationBell from '../alerts/NotificationBell';
 
 export default function TopBar({ title, onToggleSidebar }) {
-  const { user, companies, activeCompany, switchCompany, isAdmin, isAdvanced } = useApp();
+  const { user, companies, activeCompany, switchCompany, isAdmin, isAdvanced, refreshCompanies } = useApp();
   const [syncing, setSyncing] = React.useState(false);
 
   async function handleSync() {
+    if (!activeCompany) return;
     setSyncing(true);
-    // Will call backend sync function when implemented
-    setTimeout(() => setSyncing(false), 2000);
+    
+    try {
+      await base44.functions.invoke('holdedApi', {
+        companyId: activeCompany.id,
+        action: 'sync_all',
+      });
+      
+      // Log audit
+      await base44.functions.invoke('auditLog', {
+        action: 'etl_refresh',
+        module: 'system',
+        company_id: activeCompany.id,
+        details: { manual: true },
+      });
+      
+      await refreshCompanies();
+    } catch (error) {
+      console.error('Sync error:', error);
+    }
+    
+    setSyncing(false);
   }
 
   return (
