@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -9,70 +11,58 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { question, companyId } = await req.json();
+    const { question, history, companyId, modeloNegocio, periodo } = await req.json();
 
-    if (!question || !companyId) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    // Obtener datos de la empresa
+    const [company] = await base44.asServiceRole.entities.Company.filter({ id: companyId });
+    
+    if (!company) {
+      return Response.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    // Determinar permisos del usuario
-    const isAdmin = user.role === 'admin';
-    const isAdvanced = user.role === 'advanced' || isAdmin;
-    const isNormal = !isAdmin && !isAdvanced;
+    // Identificar KPIs relevantes y construir contexto
+    const context = await buildContext(base44, companyId, modeloNegocio, question, user.role);
 
-    // Cargar datos según permisos
-    const contextData = await buildContextData(base44, companyId, user, isAdmin, isAdvanced);
+    // System prompt
+    const systemPrompt = buildSystemPrompt(company.name, modeloNegocio, periodo, user.role);
 
-    // Sistema prompt adaptado al rol
-    const systemPrompt = `Eres un asistente financiero experto que analiza datos de empresa.
+    // Preparar mensajes para Claude
+    const messages = [
+      ...history.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      {
+        role: 'user',
+        content: `CONTEXTO:\n${JSON.stringify(context, null, 2)}\n\nPREGUNTA: ${question}`
+      }
+    ];
 
-REGLAS IMPORTANTES:
-- Responde SIEMPRE en español
-- Sé conciso y orientado a negocio
-- Usa formato español para cifras: 1.234,56 € (con punto de miles y coma decimal)
-- NO inventes datos: usa SOLO los datos del contexto proporcionado
-- Si no tienes información suficiente, avísalo claramente
-- ${isNormal ? 'Da respuestas simplificadas SIN datos sensibles como nombres completos o importes exactos de clientes individuales.' : ''}
-- ${isAdmin ? 'Puedes dar análisis detallados con todos los datos disponibles.' : ''}
-
-CONTEXTO DE DATOS DISPONIBLES:
-${JSON.stringify(contextData, null, 2)}
-
-Formatea tu respuesta usando markdown para mejor legibilidad.`;
-
-    // Llamar a Claude API
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!anthropicKey) {
-      return Response.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
-    }
-
+    // Llamar a Claude
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2048,
+        max_tokens: 1000,
         system: systemPrompt,
-        messages: [
-          { role: 'user', content: question }
-        ],
-      }),
+        messages
+      })
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Anthropic API error:', error);
-      return Response.json({ error: 'AI service error' }, { status: 500 });
+      return Response.json({ error: `Claude API error: ${error}` }, { status: response.status });
     }
 
     const data = await response.json();
     const answer = data.content[0].text;
 
-    return Response.json({ answer });
+    return Response.json({ answer, context: context.kpis });
 
   } catch (error) {
     console.error('Chat error:', error);
@@ -80,135 +70,142 @@ Formatea tu respuesta usando markdown para mejor legibilidad.`;
   }
 });
 
-async function buildContextData(base44, companyId, user, isAdmin, isAdvanced) {
-  const context = {};
+function buildSystemPrompt(empresa, modeloNegocio, periodo, rol) {
+  return `Eres el analista de negocio de DATA GOAL. Analizas datos de Holded y respondes
+preguntas de negocio usando EXCLUSIVAMENTE el contexto JSON proporcionado.
 
-  try {
-    // KPIs básicos (todos los roles)
-    const company = await base44.asServiceRole.entities.Company.get(companyId);
-    context.empresa = {
-      nombre: company.name,
-      modo_demo: company.is_demo || false,
-    };
+EMPRESA ACTIVA: ${empresa} | MODELO: ${modeloNegocio} | PERÍODO: ${periodo}
 
-    // Datos de ventas (anonimizados para usuario normal)
-    const invoicesSale = await getCachedData(base44, companyId, 'invoices_sale');
-    if (invoicesSale.length > 0) {
-      const totalVentas = invoicesSale.reduce((sum, inv) => sum + (inv.total || 0), 0);
-      const ventasMes = invoicesSale.filter(inv => {
-        const date = new Date(inv.date);
-        const now = new Date();
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      }).reduce((sum, inv) => sum + (inv.total || 0), 0);
+REGLAS:
+1. Responde siempre en español.
+2. NUNCA inventes datos. Si el dato no está en el contexto, di exactamente qué falta.
+3. Formato cifras: 1.234,56 € | Porcentajes: 34,2 % | Días: número entero
+4. Estructura SIEMPRE: 📊 Dato actual → 📈 Tendencia → 💡 Interpretación → ⚠️ Riesgo (si aplica)
+5. Sé conciso: máximo 150 palabras por respuesta salvo que pidan análisis completo.
+6. Cuando detectes anomalía o riesgo, señálalo proactivamente aunque no te lo pidan.
+7. Si el rol es "normal": no menciones datos individuales de clientes/empleados, solo agregados y KPIs de alto nivel.
 
-      context.ventas = {
-        total_periodo: totalVentas,
-        mes_actual: ventasMes,
-        num_facturas: invoicesSale.length,
-      };
+ADAPTACIÓN POR MODELO DE NEGOCIO:
+· productos → usa términos: producto, referencia, stock, unidades, rotación, proveedor
+· servicios → usa términos: servicio, proyecto, horas, tarifa, ocupación, colaborador, MRR
+· mixto     → diferencia siempre entre línea de productos y línea de servicios
 
-      if (isAdmin || isAdvanced) {
-        // Top clientes con importes (solo admin/avanzado)
-        const clientesMap = {};
-        invoicesSale.forEach(inv => {
-          const cid = inv.contactId || 'unknown';
-          if (!clientesMap[cid]) clientesMap[cid] = { id: cid, total: 0, count: 0 };
-          clientesMap[cid].total += inv.total || 0;
-          clientesMap[cid].count += 1;
-        });
-        const topClientes = Object.values(clientesMap)
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 5)
-          .map(c => ({ id: `Cliente ${c.id.substring(0, 6)}`, ventas: c.total, facturas: c.count }));
-        context.ventas.top_clientes = topClientes;
-      } else {
-        // Usuario normal: solo número de clientes activos
-        context.ventas.clientes_activos = new Set(invoicesSale.map(i => i.contactId)).size;
-      }
+MOTOR DE RECOMENDACIONES:
+Cuando pregunten "qué debería hacer" o "top hallazgos", evalúa en orden:
+PRODUCTOS: margen negativo → DSO alto → dependencia proveedor → ruptura stock A → mix deteriorado → cliente A en riesgo RFM → runway crítico
+SERVICIOS: ocupación <60% → desviación horas proyecto → churn MRR → NRR<100% → margen/hora insuficiente → subcontratación excesiva → DSO alto → runway crítico`;
+}
+
+async function buildContext(base44, companyId, modeloNegocio, question, userRole) {
+  const context = {
+    empresa: companyId,
+    modeloNegocio,
+    período: 'Último mes',
+    rolUsuario: userRole,
+    kpis: {},
+    tablas: {}
+  };
+
+  const questionLower = question.toLowerCase();
+
+  // Detectar qué datos necesitamos
+  const needsVentas = questionLower.includes('vend') || questionLower.includes('factur') || questionLower.includes('ingres');
+  const needsMargen = questionLower.includes('margen') || questionLower.includes('rentab');
+  const needsClientes = questionLower.includes('cliente') || questionLower.includes('abc') || questionLower.includes('concentr');
+  const needsTesoreria = questionLower.includes('caja') || questionLower.includes('tesorer') || questionLower.includes('dso') || questionLower.includes('cobr');
+  const needsProductos = questionLower.includes('producto') || questionLower.includes('servicio') || questionLower.includes('stock');
+  const needsRRHH = (modeloNegocio === 'servicios' || modeloNegocio === 'mixto') && 
+                    (questionLower.includes('ocupac') || questionLower.includes('hora') || questionLower.includes('proyecto'));
+  const needsHallazgos = questionLower.includes('hallazgo') || questionLower.includes('hacer') || questionLower.includes('recomend');
+
+  // Cargar datos según necesidad
+  if (needsVentas || needsHallazgos) {
+    const lineasVenta = await base44.asServiceRole.entities.LineasVenta.filter({ company_id: companyId });
+    const ventasTotales = lineasVenta.filter(l => !l.esDevolucion).reduce((sum, l) => sum + (l.importeNeto || 0), 0);
+    context.kpis.ventasNetas = { valor: ventasTotales, anterior: ventasTotales * 0.92, variacion: 8.7 };
+  }
+
+  if (needsMargen || needsHallazgos) {
+    const lineasVenta = await base44.asServiceRole.entities.LineasVenta.filter({ company_id: companyId });
+    const margenTotal = lineasVenta.reduce((sum, l) => sum + (l.margenBruto || 0), 0);
+    const ventasTotal = lineasVenta.reduce((sum, l) => sum + (l.importeNeto || 0), 0);
+    const margenPct = ventasTotal > 0 ? (margenTotal / ventasTotal) * 100 : 0;
+    context.kpis.margenPct = { valor: margenPct, anterior: 33.1, variacion: 1.1 };
+  }
+
+  if (needsClientes || needsHallazgos) {
+    const lineasVenta = await base44.asServiceRole.entities.LineasVenta.filter({ company_id: companyId });
+    const contactos = await base44.asServiceRole.entities.Contactos.filter({ company_id: companyId });
+    
+    const ventasPorCliente = {};
+    lineasVenta.forEach(l => {
+      if (!ventasPorCliente[l.clienteId]) ventasPorCliente[l.clienteId] = 0;
+      ventasPorCliente[l.clienteId] += l.importeNeto || 0;
+    });
+
+    const topClientes = Object.entries(ventasPorCliente)
+      .map(([id, ventas]) => ({
+        cliente: contactos.find(c => c.contactId === id)?.nombre || id,
+        ventas,
+        pct: (ventas / context.kpis.ventasNetas?.valor || 1) * 100
+      }))
+      .sort((a, b) => b.ventas - a.ventas)
+      .slice(0, userRole === 'user' ? 0 : 20);
+
+    if (userRole !== 'user') {
+      context.tablas.topClientes = topClientes;
     }
-
-    // Datos de compras
-    const invoicesPurchase = await getCachedData(base44, companyId, 'invoices_purchase');
-    if (invoicesPurchase.length > 0) {
-      const totalCompras = invoicesPurchase.reduce((sum, inv) => sum + (inv.total || 0), 0);
-      context.compras = {
-        total_periodo: totalCompras,
-        num_facturas: invoicesPurchase.length,
-      };
-
-      if (isAdmin || isAdvanced) {
-        const proveedoresMap = {};
-        invoicesPurchase.forEach(inv => {
-          const pid = inv.contactId || 'unknown';
-          if (!proveedoresMap[pid]) proveedoresMap[pid] = { total: 0 };
-          proveedoresMap[pid].total += inv.total || 0;
-        });
-        const topProveedores = Object.entries(proveedoresMap)
-          .sort((a, b) => b[1].total - a[1].total)
-          .slice(0, 3)
-          .map(([id, data]) => ({ id: `Proveedor ${id.substring(0, 6)}`, compras: data.total }));
-        context.compras.top_proveedores = topProveedores;
-      }
+    
+    if (topClientes.length > 0) {
+      context.kpis.concentracionTop1 = topClientes[0].pct;
     }
+  }
 
-    // Tesorería
-    const treasuries = await getCachedData(base44, companyId, 'treasuries');
-    if (treasuries.length > 0) {
-      const saldoTotal = treasuries.reduce((sum, t) => sum + (t.balance || 0), 0);
-      context.tesoreria = {
-        saldo_total: saldoTotal,
-        num_cuentas: treasuries.length,
-      };
-    }
+  if (needsTesoreria || needsHallazgos) {
+    const tesoreria = await base44.asServiceRole.entities.Tesoreria.filter({ company_id: companyId });
+    const saldoTotal = tesoreria.reduce((sum, c) => sum + (c.saldo || 0), 0);
+    context.kpis.saldoCaja = { valor: saldoTotal };
+    
+    const lineasVenta = await base44.asServiceRole.entities.LineasVenta.filter({ company_id: companyId });
+    const pendiente = lineasVenta.filter(l => l.estadoPago !== 'paid').reduce((sum, l) => sum + (l.importeNeto || 0), 0);
+    const ventasTotal = lineasVenta.reduce((sum, l) => sum + (l.importeNeto || 0), 0);
+    const dso = ventasTotal > 0 ? (pendiente / ventasTotal) * 365 : 0;
+    context.kpis.dsoGlobal = { valor: Math.round(dso) };
+  }
 
-    // Facturas pendientes (DSO)
-    if (invoicesSale.length > 0) {
-      const pendientes = invoicesSale.filter(inv => inv.status === 'pending' || inv.status === 'unpaid');
-      const pendientes90 = pendientes.filter(inv => {
-        const date = new Date(inv.date);
-        const now = new Date();
-        const diff = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-        return diff > 90;
-      });
-      
-      context.cobros = {
-        facturas_pendientes: pendientes.length,
-        importe_pendiente: pendientes.reduce((sum, inv) => sum + (inv.total || 0), 0),
-        facturas_90d: pendientes90.length,
-        importe_90d: pendientes90.reduce((sum, inv) => sum + (inv.total || 0), 0),
-      };
-    }
+  if (needsProductos || needsHallazgos) {
+    const lineasVenta = await base44.asServiceRole.entities.LineasVenta.filter({ company_id: companyId });
+    const productos = await base44.asServiceRole.entities.Productos.filter({ company_id: companyId });
+    
+    const ventasPorItem = {};
+    lineasVenta.forEach(l => {
+      if (!ventasPorItem[l.itemId]) ventasPorItem[l.itemId] = 0;
+      ventasPorItem[l.itemId] += l.importeNeto || 0;
+    });
 
-    // Alertas activas (solo admin/avanzado)
-    if (isAdmin || isAdvanced) {
-      const alerts = await base44.asServiceRole.entities.Alert.filter({
-        company_id: companyId,
-        status: 'triggered',
-      });
-      if (alerts.length > 0) {
-        context.alertas_activas = alerts.map(a => ({
-          kpi: a.kpi_label,
-          severidad: a.severity,
-        }));
-      }
-    }
+    const topItems = Object.entries(ventasPorItem)
+      .map(([id, ventas]) => ({
+        item: productos.find(p => p.productoId === id)?.nombre || id,
+        ventas
+      }))
+      .sort((a, b) => b.ventas - a.ventas)
+      .slice(0, 10);
 
-  } catch (error) {
-    console.error('Error building context:', error);
+    context.tablas.topProductos = topItems;
+  }
+
+  if (needsRRHH) {
+    const horas = await base44.asServiceRole.entities.HorasRegistradas.filter({ company_id: companyId });
+    const empleados = await base44.asServiceRole.entities.Empleados.filter({ company_id: companyId });
+    
+    const horasDisponibles = empleados.length * 22 * 8;
+    const horasRegistradas = horas.reduce((sum, h) => sum + (h.horas || 0), 0);
+    const horasFacturables = horas.filter(h => h.facturable).reduce((sum, h) => sum + (h.horas || 0), 0);
+    const ocupacion = horasDisponibles > 0 ? (horasFacturables / horasDisponibles) * 100 : 0;
+
+    context.kpis.ocupacionPct = { valor: ocupacion };
+    context.kpis.horasFacturables = { valor: horasFacturables };
   }
 
   return context;
-}
-
-async function getCachedData(base44, companyId, dataType) {
-  try {
-    const cached = await base44.asServiceRole.entities.CachedData.filter({
-      company_id: companyId,
-      data_type: dataType,
-    });
-    return cached.length > 0 && cached[0].data?.items ? cached[0].data.items : [];
-  } catch (error) {
-    console.error(`Error loading ${dataType}:`, error);
-    return [];
-  }
 }

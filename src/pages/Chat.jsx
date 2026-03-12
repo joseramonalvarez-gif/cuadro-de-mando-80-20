@@ -1,187 +1,280 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../components/shared/DemoContext';
 import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Send, Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Send, RefreshCw, Sparkles } from 'lucide-react';
 import LoadingState from '../components/shared/LoadingState';
-import ReactMarkdown from 'react-markdown';
-
-const FAQ_QUESTIONS = [
-  '¿Cuáles son los 5 clientes que más facturación generan este mes?',
-  '¿Cuál es mi margen bruto actual?',
-  '¿Tengo facturas pendientes de cobro con más de 90 días?',
-  '¿Qué producto se vende más este trimestre?',
-  '¿Cuál es mi previsión de caja para los próximos 30 días?',
-  '¿Qué proveedor concentra más mis compras?',
-  '¿Hay alguna alerta activa que deba atender?',
-  '¿Cuál es mi DSO actual y cómo está respecto al mes anterior?',
-];
+import DemoBanner from '../components/shared/DemoBanner';
 
 export default function Chat() {
-  const { user, activeCompany, loading: appLoading, isAdmin, isAdvanced } = useApp();
+  const { activeCompany, user, loading: contextLoading } = useApp();
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const isNormalUser = !isAdmin && !isAdvanced;
+  const isDemo = !activeCompany?.holded_api_key || activeCompany?.is_demo;
+  const modeloNegocio = activeCompany?.modelo_negocio || 'mixto';
+  const userRole = user?.role || 'user';
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [messages]);
 
-  async function sendMessage(text) {
-    if (!text.trim()) return;
-    
-    const userMsg = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsThinking(true);
+  const suggestedQuestions = getSuggestedQuestions(modeloNegocio, userRole);
 
-    try {
-      const response = await base44.functions.invoke('chatIntelligente', {
-        question: text,
-        companyId: activeCompany.id,
-      });
+  async function handleSendMessage(customQuestion) {
+    const questionText = customQuestion || question;
+    if (!questionText.trim()) return;
 
-      if (response.data?.answer) {
-        setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
-      } else {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'Lo siento, ha ocurrido un error al procesar tu pregunta. Por favor, inténtalo de nuevo.' 
-        }]);
-      }
-    } catch (error) {
-      console.error('Chat error:', error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Lo siento, no he podido procesar tu pregunta en este momento. Por favor, verifica que la API Key de Claude esté configurada correctamente.' 
-      }]);
+    const userMessage = { role: 'user', content: questionText };
+    setMessages(prev => [...prev, userMessage]);
+    setQuestion('');
+    setLoading(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        const demoAnswer = generateDemoAnswer(questionText, modeloNegocio);
+        setMessages(prev => [...prev, { role: 'assistant', content: demoAnswer }]);
+        setLoading(false);
+      }, 1500);
+      return;
     }
 
-    setIsThinking(false);
+    try {
+      const history = messages.filter(m => m.role !== 'system');
+      
+      const response = await base44.functions.invoke('chatIntelligente', {
+        question: questionText,
+        history,
+        companyId: activeCompany.id,
+        modeloNegocio,
+        periodo: 'Último mes'
+      });
+
+      const assistantMessage = { role: 'assistant', content: response.data.answer };
+      setMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage = { 
+        role: 'assistant', 
+        content: '❌ Error al procesar tu pregunta. Por favor, intenta de nuevo.' 
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+
+    setLoading(false);
   }
 
-  if (appLoading) return <LoadingState />;
+  function handleNewConversation() {
+    setMessages([]);
+    setQuestion('');
+  }
+
+  function getSuggestedQuestions(modelo, role) {
+    const base = [
+      '¿Cuánto hemos facturado este mes?',
+      '¿Cuál es nuestro margen?',
+      '¿Hay facturas vencidas?'
+    ];
+
+    if (role === 'admin' || role === 'avanzado') {
+      if (modelo === 'productos' || modelo === 'mixto') {
+        return [
+          ...base,
+          'Análisis ABC de clientes',
+          'Top 5 hallazgos para actuar esta semana',
+          '¿Qué productos tienen margen negativo?'
+        ];
+      } else if (modelo === 'servicios') {
+        return [
+          ...base,
+          '¿Cuál es nuestra ocupación?',
+          '¿Qué proyectos están desviados en horas?',
+          'Top 5 hallazgos para actuar esta semana'
+        ];
+      }
+    }
+
+    if (modelo === 'servicios' || modelo === 'mixto') {
+      return [...base, '¿Cuál es nuestra ocupación?'];
+    }
+
+    return [...base, '¿Hay stock sin existencias?'];
+  }
+
+  function generateDemoAnswer(question, modelo) {
+    const qLower = question.toLowerCase();
+
+    if (qLower.includes('vend') || qLower.includes('factur')) {
+      return `📊 **Ventas del período:** 284.750 €
+
+📈 **Tendencia:** +8,2% vs mismo período año anterior (263.200 €)
+
+💡 **Interpretación:** Crecimiento saludable. La tendencia es positiva y sostenida.
+
+${modelo === 'servicios' ? '✅ **Nota:** El 65% corresponde a contratos recurrentes (MRR)' : '✅ **Nota:** El 70% corresponde a clientes clase A'}`;
+    }
+
+    if (qLower.includes('margen')) {
+      return `📊 **Margen bruto:** 34,2%
+
+📈 **Tendencia:** +1,1 pp vs período anterior (33,1%)
+
+💡 **Interpretación:** Margen saludable y en mejora. Por encima del objetivo mínimo (25%).
+
+⚠️ **Riesgo detectado:** 3 ${modelo === 'servicios' ? 'proyectos' : 'productos'} con margen negativo que erosionan el agregado.`;
+    }
+
+    if (qLower.includes('ocupac')) {
+      return `📊 **Ocupación del equipo:** 76,7%
+
+📈 **Tendencia:** Estable (+2 pp vs mes anterior)
+
+💡 **Interpretación:** Ocupación óptima (🟢 >75%). El equipo está bien aprovechado sin riesgo de burnout.
+
+✅ **Nota:** 1.620 horas facturables de 2.112 disponibles.`;
+    }
+
+    if (qLower.includes('hallazgo') || qLower.includes('hacer')) {
+      return `🎯 **Top 5 Hallazgos para Actuar:**
+
+1. ⚠️ **DSO en 52 días** (objetivo: <45d) → Acelerar cobros
+2. 🔴 **Morosidad crítica:** 12.500 € con +90d vencido
+3. 💡 **Cliente "ACME Corp":** Clase A en ventas pero margen negativo
+4. 📉 **${modelo === 'servicios' ? 'Proyecto "Web Corp" desviado +31% en horas' : 'Producto "Standard" sin rotación en 45 días'}'
+5. 🟡 **Dependencia:** Proveedor "Global SL" representa 28,5% de compras
+
+💼 **Acción inmediata:** Revisar condiciones con ACME Corp y ejecutar gestión de cobros +90d.`;
+    }
+
+    return `📊 He analizado tu pregunta sobre "${question}".
+
+💡 **Interpretación:** Basándome en los datos actuales de tu empresa, los indicadores están dentro de rangos normales.
+
+❓ Para darte una respuesta más específica, prueba con preguntas como:
+· "¿Cuánto hemos facturado este mes?"
+· "¿Cuál es nuestro margen?"
+· "Top 5 hallazgos para actuar esta semana"`;
+  }
+
+  if (contextLoading) {
+    return <LoadingState message="Cargando chat inteligente..." />;
+  }
 
   return (
-    <div className="max-w-[900px] mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2.5 rounded-xl bg-[#33A19A]/10">
-          <Sparkles className="w-5 h-5 text-[#33A19A]" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-[#1B2731] font-['Space_Grotesk']">Chat Inteligente</h2>
-          <p className="text-xs text-[#3E4C59]">Pregunta sobre tus datos financieros</p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      {isDemo && <DemoBanner />}
 
-      {/* Messages area */}
-      <div className="bg-white rounded-2xl shadow-[0_1px_3px_rgba(27,39,49,0.06)] border border-[#E8EEEE]/60 min-h-[500px] flex flex-col">
-        <div className="flex-1 p-5 space-y-4 overflow-y-auto max-h-[520px]">
-          {messages.length === 0 && (
-            <div className="text-center py-12">
-              <Bot className="w-10 h-10 text-[#B7CAC9] mx-auto mb-3" />
-              <p className="text-sm text-[#3E4C59] mb-6">¿En qué puedo ayudarte hoy?</p>
-              
-              {/* FAQ Questions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-[600px] mx-auto">
-                {FAQ_QUESTIONS.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(q)}
-                    className="text-left text-xs p-3 rounded-xl border border-[#E8EEEE] hover:border-[#33A19A] hover:bg-[#F0F7F7] transition-colors text-[#3E4C59]"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+      <div className="bg-white rounded-xl border border-[#E8EEEE] p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#33A19A] to-[#3E8CDD] flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-          )}
+            <div>
+              <h2 className="text-lg font-semibold text-[#1B2731] font-['Space_Grotesk']">
+                Chat Inteligente
+              </h2>
+              <p className="text-sm text-[#3E4C59]">
+                Pregunta sobre tus datos en lenguaje natural
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNewConversation}
+            className="text-[#3E4C59]"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Nueva conversación
+          </Button>
+        </div>
 
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-lg bg-[#33A19A]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Bot className="w-3.5 h-3.5 text-[#33A19A]" />
+        {/* Preguntas sugeridas */}
+        {messages.length === 0 && (
+          <div className="mb-6">
+            <p className="text-sm text-[#3E4C59] mb-3">Preguntas sugeridas:</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedQuestions.map((q, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendMessage(q)}
+                  className="px-3 py-2 text-sm bg-[#F0F5F5] hover:bg-[#E6F7F6] text-[#3E4C59] rounded-lg transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mensajes */}
+        <div className="space-y-4 mb-6 max-h-[500px] overflow-y-auto">
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                  msg.role === 'user'
+                    ? 'bg-[#33A19A] text-white'
+                    : 'bg-[#F0F5F5] text-[#1B2731]'
+                }`}
+              >
+                <div className="text-sm whitespace-pre-line">
+                  {msg.content}
                 </div>
-              )}
-              <div className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-                msg.role === 'user'
-                  ? 'bg-[#1B2731] text-white'
-                  : 'bg-[#F8F6F1] text-[#1B2731]'
-              }`}>
-                {msg.role === 'user' ? (
-                  <p className="text-sm">{msg.content}</p>
-                ) : (
-                  <div className="text-sm prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-li:my-0.5">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
-                )}
               </div>
-              {msg.role === 'user' && (
-                <div className="w-7 h-7 rounded-lg bg-[#1B2731]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <User className="w-3.5 h-3.5 text-[#1B2731]" />
-                </div>
-              )}
             </div>
           ))}
-
-          {isThinking && (
-            <div className="flex gap-3">
-              <div className="w-7 h-7 rounded-lg bg-[#33A19A]/10 flex items-center justify-center flex-shrink-0">
-                <Bot className="w-3.5 h-3.5 text-[#33A19A]" />
-              </div>
-              <div className="bg-[#F8F6F1] rounded-2xl px-4 py-3 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-[#33A19A]" />
-                <span className="text-xs text-[#3E4C59]">Analizando datos...</span>
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-[#F0F5F5] rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#33A19A] rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-[#33A19A] rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-[#33A19A] rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  <span className="text-sm text-[#3E4C59] ml-2">Analizando...</span>
+                </div>
               </div>
             </div>
           )}
-
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="border-t border-[#E8EEEE] p-4">
-          {messages.length > 0 && (
-            <div className="mb-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setMessages([])}
-                className="text-xs text-[#3E4C59] hover:text-[#33A19A]"
-              >
-                Nueva conversación
-              </Button>
-            </div>
-          )}
-          <form
-            onSubmit={(e) => { e.preventDefault(); sendMessage(input); }}
-            className="flex gap-2"
+        {/* Input */}
+        <div className="flex gap-3">
+          <Input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && !loading && handleSendMessage()}
+            placeholder="Escribe tu pregunta..."
+            disabled={loading}
+            className="flex-1"
+          />
+          <Button
+            onClick={() => handleSendMessage()}
+            disabled={loading || !question.trim()}
           >
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={isNormalUser ? 'Selecciona una pregunta FAQ...' : 'Escribe tu pregunta sobre los datos de tu empresa...'}
-              className="flex-1 border-[#B7CAC9] focus:border-[#33A19A]"
-              disabled={isThinking || (isNormalUser && !input.trim())}
-            />
-            <Button
-              type="submit"
-              disabled={!input.trim() || isThinking}
-              className="bg-[#33A19A] hover:bg-[#2B8A84] text-white"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-          {isNormalUser && (
-            <p className="text-xs text-[#B7CAC9] mt-2">
-              Usuario Normal: Solo puedes usar las preguntas predefinidas arriba
-            </p>
-          )}
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="mt-4 p-3 bg-[#FFFAF3] rounded-lg border border-[#E6A817]/20">
+          <p className="text-xs text-[#3E4C59]">
+            💡 <strong>Tip:</strong> El chat analiza solo los datos de tu empresa actual ({activeCompany?.name}). 
+            Puedes preguntar sobre ventas, márgenes, clientes, tesorería, productos
+            {(modeloNegocio === 'servicios' || modeloNegocio === 'mixto') && ', ocupación, proyectos'} y más.
+          </p>
         </div>
       </div>
     </div>
