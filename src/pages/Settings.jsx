@@ -11,6 +11,7 @@ import CostProfilesSection from '../components/settings/CostProfilesSection';
 import UsersSection from '../components/settings/UsersSection';
 import PermissionsSection from '../components/settings/PermissionsSection';
 import DataQualitySection from '../components/settings/DataQualitySection';
+import DiagnosticoSection from '../components/settings/DiagnosticoSection';
 import SystemParamsSection from '../components/settings/SystemParamsSection';
 import AuditSection from '../components/settings/AuditSection';
 import TaxCalendarSection from '../components/settings/TaxCalendarSection';
@@ -113,7 +114,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 lg:grid-cols-8 w-full mb-6">
+        <TabsList className="grid grid-cols-4 lg:grid-cols-9 w-full mb-6">
           <TabsTrigger value="companies" className="flex items-center gap-2">
             <Building2 className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Empresas</span>
@@ -133,6 +134,10 @@ export default function SettingsPage() {
           <TabsTrigger value="quality" className="flex items-center gap-2">
             <BarChart3 className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Calidad</span>
+          </TabsTrigger>
+          <TabsTrigger value="diagnostico" className="flex items-center gap-2">
+            <Settings className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Diagnóstico</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Sliders className="w-3.5 h-3.5" />
@@ -181,8 +186,11 @@ export default function SettingsPage() {
         <TabsContent value="quality">
           <DataQualitySection 
             modeloNegocio={activeCompany?.modelo_negocio || 'mixto'}
-            quality={{}}
           />
+        </TabsContent>
+
+        <TabsContent value="diagnostico">
+          <DiagnosticoSection />
         </TabsContent>
 
         <TabsContent value="system">
