@@ -15,7 +15,7 @@ import {
   calcularVentasNetas, 
   calcularMargenBruto,
   convertirAEUR 
-} from '../utils/kpiCalculations';
+} from '../components/shared/kpiCalculations';
 
 export default function Home() {
   const { activeCompany, loading } = useApp();
