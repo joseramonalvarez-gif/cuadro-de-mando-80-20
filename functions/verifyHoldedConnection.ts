@@ -12,32 +12,25 @@ Deno.serve(async (req) => {
     const { apiKey } = await req.json();
 
     if (!apiKey) {
-      return Response.json({ error: 'API Key is required' }, { status: 400 });
+      return Response.json({ error: 'API Key required' }, { status: 400 });
     }
 
-    // Test connection to Holded API
-    const testResponse = await fetch('https://api.holded.com/api/invoicing/v1/contacts?page=1&perPage=1', {
+    // Verificar con endpoint de contactos
+    const response = await fetch('https://api.holded.com/api/invoicing/v1/contacts?page=1&perPage=1', {
       headers: {
-        'Accept': 'application/json',
         'key': apiKey,
-      },
+        'Accept': 'application/json'
+      }
     });
 
-    if (testResponse.ok) {
-      return Response.json({ success: true, message: 'Conexión verificada correctamente' });
+    if (response.ok) {
+      return Response.json({ valid: true, message: 'Conexión verificada correctamente' });
     } else {
-      const error = await testResponse.text();
-      return Response.json({ 
-        success: false, 
-        message: `Error ${testResponse.status}: ${error}` 
-      }, { status: 400 });
+      return Response.json({ valid: false, message: 'API Key inválida' });
     }
 
   } catch (error) {
     console.error('Verification error:', error);
-    return Response.json({ 
-      success: false, 
-      message: error.message 
-    }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 });

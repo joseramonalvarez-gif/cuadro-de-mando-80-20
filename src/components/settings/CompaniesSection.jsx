@@ -1,140 +1,135 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Plus, RefreshCw, Edit, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import CompanyFormModal from './CompanyFormModal';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { RefreshCw, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 
-export default function CompaniesSection() {
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingCompany, setEditingCompany] = useState(null);
+export default function CompaniesSection({ companies, onUpdate }) {
+  const [verifying, setVerifying] = useState({});
   const [syncing, setSyncing] = useState({});
+  const [showKey, setShowKey] = useState({});
 
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  async function handleVerifyConnection(companyId, apiKey) {
+    setVerifying({ ...verifying, [companyId]: true });
+    
+    try {
+      const response = await base44.functions.invoke('verifyHoldedConnection', {
+        apiKey
+      });
 
-  async function loadCompanies() {
-    setLoading(true);
-    const data = await base44.entities.Company.list();
-    setCompanies(data);
-    setLoading(false);
+      if (response.data.valid) {
+        alert('✅ Conexión verificada correctamente');
+      } else {
+        alert('❌ API Key inválida');
+      }
+    } catch (error) {
+      alert('❌ Error al verificar: ' + error.message);
+    }
+
+    setVerifying({ ...verifying, [companyId]: false });
   }
 
   async function handleSync(companyId) {
-    setSyncing(prev => ({ ...prev, [companyId]: true }));
+    setSyncing({ ...syncing, [companyId]: true });
+    
     try {
       await base44.functions.invoke('holdedApi', {
         companyId,
-        action: 'sync_all',
+        action: 'sync_all'
       });
-      await loadCompanies();
+      
+      alert('✅ Sincronización completada');
+      await onUpdate();
     } catch (error) {
-      console.error('Sync error:', error);
+      alert('❌ Error en sincronización: ' + error.message);
     }
-    setSyncing(prev => ({ ...prev, [companyId]: false }));
-  }
 
-  function handleEdit(company) {
-    setEditingCompany(company);
-    setShowModal(true);
+    setSyncing({ ...syncing, [companyId]: false });
   }
-
-  function handleCloseModal() {
-    setShowModal(false);
-    setEditingCompany(null);
-    loadCompanies();
-  }
-
-  if (loading) return <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-[#1B2731]">Empresas Registradas</h3>
-        <Button onClick={() => setShowModal(true)} className="bg-[#33A19A] hover:bg-[#2B8A84]">
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Empresa
-        </Button>
-      </div>
+    <div className="space-y-4">
+      {companies.map(company => (
+        <div key={company.id} className="bg-white rounded-xl border border-[#E8EEEE] p-6">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Nombre Empresa</Label>
+              <Input
+                value={company.name}
+                onChange={(e) => onUpdate(company.id, { name: e.target.value })}
+              />
+            </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Última Sincronización</TableHead>
-            <TableHead>Usuarios</TableHead>
-            <TableHead>Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companies.map(company => (
-            <TableRow key={company.id}>
-              <TableCell className="font-medium">{company.name}</TableCell>
-              <TableCell>
-                {company.is_demo ? (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                    Demo
-                  </Badge>
-                ) : (
-                  <Badge className="bg-green-50 text-green-700 border-green-200">
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Activa
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {company.last_sync_date ? (
-                  <span className="text-xs text-[#3E4C59]">
-                    {format(new Date(company.last_sync_date), "dd MMM yyyy HH:mm", { locale: es })}
-                  </span>
-                ) : (
-                  <span className="text-xs text-[#B7CAC9]">Nunca</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{(company.allowed_users || []).length} usuarios</Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(company)}
+            <div>
+              <Label>Modelo de Negocio</Label>
+              <Select
+                value={company.modelo_negocio}
+                onValueChange={(val) => onUpdate(company.id, { modelo_negocio: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="productos">Productos</SelectItem>
+                  <SelectItem value="servicios">Servicios</SelectItem>
+                  <SelectItem value="mixto">Mixto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2">
+              <Label>API Key Holded</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showKey[company.id] ? 'text' : 'password'}
+                    value={company.holded_api_key || ''}
+                    onChange={(e) => onUpdate(company.id, { holded_api_key: e.target.value })}
+                    placeholder="Introduce la API Key de Holded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey({ ...showKey, [company.id]: !showKey[company.id] })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B7CAC9] hover:text-[#3E4C59]"
                   >
-                    <Edit className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSync(company.id)}
-                    disabled={syncing[company.id]}
-                  >
-                    {syncing[company.id] ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    )}
-                  </Button>
+                    {showKey[company.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                <Button
+                  variant="outline"
+                  onClick={() => handleVerifyConnection(company.id, company.holded_api_key)}
+                  disabled={!company.holded_api_key || verifying[company.id]}
+                >
+                  {verifying[company.id] ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Verificar'
+                  )}
+                </Button>
+              </div>
+            </div>
 
-      {showModal && (
-        <CompanyFormModal
-          company={editingCompany}
-          onClose={handleCloseModal}
-        />
-      )}
+            <div className="md:col-span-2 flex gap-3 mt-2">
+              <Button
+                onClick={() => handleSync(company.id)}
+                disabled={syncing[company.id] || !company.holded_api_key}
+                className="bg-[#33A19A] hover:bg-[#2A8A84]"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${syncing[company.id] ? 'animate-spin' : ''}`} />
+                Actualizar datos ahora
+              </Button>
+
+              {company.last_sync_date && (
+                <span className="text-sm text-[#3E4C59] self-center">
+                  Última sincronización: {new Date(company.last_sync_date).toLocaleString('es-ES')}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

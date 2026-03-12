@@ -1,119 +1,123 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, UserX, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import UserFormModal from './UserFormModal';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
-export default function UsersSection() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+export default function UsersSection({ users, onUpdate, onDelete, onInvite }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  async function loadUsers() {
-    setLoading(true);
-    const data = await base44.entities.User.list();
-    setUsers(data);
-    setLoading(false);
-  }
-
-  function handleEdit(user) {
-    setEditingUser(user);
-    setShowModal(true);
-  }
-
-  function handleCloseModal() {
-    setShowModal(false);
-    setEditingUser(null);
-    loadUsers();
-  }
-
-  if (loading) return <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
   const adminCount = users.filter(u => u.role === 'admin').length;
 
+  function handleDelete(user) {
+    if (user.role === 'admin' && adminCount === 1) {
+      alert('❌ No puedes eliminar el último administrador del sistema');
+      return;
+    }
+
+    if (confirm(`¿Seguro que quieres eliminar a ${user.email}?`)) {
+      onDelete(user.id);
+    }
+  }
+
+  function getRoleBadge(role) {
+    const colors = {
+      admin: 'bg-[#E05252] text-white',
+      avanzado: 'bg-[#33A19A] text-white',
+      user: 'bg-[#E8EEEE] text-[#3E4C59]'
+    };
+
+    const labels = {
+      admin: 'Admin',
+      avanzado: 'Avanzado',
+      user: 'Normal'
+    };
+
+    return (
+      <Badge className={colors[role] || colors.user}>
+        {labels[role] || role}
+      </Badge>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-[#1B2731]">Usuarios del Sistema</h3>
-        <Button onClick={() => setShowModal(true)} className="bg-[#33A19A] hover:bg-[#2B8A84]">
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-[#1B2731] font-['Space_Grotesk']">
+          Gestión de Usuarios
+        </h3>
+        <Button onClick={() => { setEditingUser(null); setModalOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
+          Invitar Usuario
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nombre</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Rol</TableHead>
-            <TableHead>Empresas</TableHead>
-            <TableHead>Último Acceso</TableHead>
-            <TableHead>Acciones</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map(user => (
-            <TableRow key={user.id}>
-              <TableCell className="font-medium">{user.full_name}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>
-                <Badge className={
-                  user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                  user.role === 'advanced' ? 'bg-blue-100 text-blue-700' :
-                  'bg-gray-100 text-gray-700'
-                }>
-                  {user.role === 'admin' ? 'Admin' : user.role === 'advanced' ? 'Avanzado' : 'Normal'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{(user.assigned_companies || []).length}</Badge>
-              </TableCell>
-              <TableCell>
-                <span className="text-xs text-[#3E4C59]">
-                  {user.created_date ? format(new Date(user.created_date), "dd MMM yyyy", { locale: es }) : '—'}
-                </span>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(user)}
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                  </Button>
-                  {!(user.role === 'admin' && adminCount === 1) && (
+      <div className="bg-white rounded-xl border border-[#E8EEEE]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead>Último Acceso</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map(user => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.full_name}</TableCell>
+                <TableCell className="text-[#3E4C59]">{user.email}</TableCell>
+                <TableCell>{getRoleBadge(user.role)}</TableCell>
+                <TableCell className="text-sm text-[#B7CAC9]">
+                  {user.updated_date ? new Date(user.updated_date).toLocaleDateString('es-ES') : '-'}
+                </TableCell>
+                <TableCell>
+                  <Badge className="bg-[#E6F7F6] text-[#33A19A]">Activo</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
+                      size="icon"
+                      onClick={() => { setEditingUser(user); setModalOpen(true); }}
                     >
-                      <UserX className="w-3.5 h-3.5" />
+                      <Pencil className="w-4 h-4 text-[#3E4C59]" />
                     </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(user)}
+                      disabled={user.role === 'admin' && adminCount === 1}
+                    >
+                      <Trash2 className="w-4 h-4 text-[#E05252]" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
-      {showModal && (
-        <UserFormModal
-          user={editingUser}
-          onClose={handleCloseModal}
-        />
-      )}
+      <UserFormModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditingUser(null); }}
+        onSave={(data) => {
+          if (editingUser) {
+            onUpdate(editingUser.id, data);
+          } else {
+            onInvite(data);
+          }
+          setModalOpen(false);
+          setEditingUser(null);
+        }}
+        user={editingUser}
+      />
     </div>
   );
 }

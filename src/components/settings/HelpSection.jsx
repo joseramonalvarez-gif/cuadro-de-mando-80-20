@@ -1,88 +1,47 @@
 import React from 'react';
-import { Button } from "@/components/ui/button";
-import { ExternalLink, Book, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Book, Mail, Video } from 'lucide-react';
 
 export default function HelpSection() {
   return (
-    <div className="space-y-6">
-      {/* Quick Guide */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-        <h3 className="text-lg font-semibold text-[#1B2731] mb-4">Guía Rápida de Uso</h3>
-        
-        <div className="space-y-4 text-sm text-[#3E4C59]">
-          <div>
-            <h4 className="font-semibold text-[#1B2731] mb-2">Para Administradores:</h4>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Gestiona empresas y usuarios desde el módulo de Configuración</li>
-              <li>Configura alertas automáticas en el módulo de Alertas</li>
-              <li>Define permisos por rol para cada módulo</li>
-              <li>Consulta el log de auditoría para trazabilidad completa</li>
-              <li>Usa el Chat Inteligente para análisis avanzados con IA</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-[#1B2731] mb-2">Para Usuarios Avanzados:</h4>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Accede a todos los módulos analíticos: Ventas, Compras, Tesorería, etc.</li>
-              <li>Crea alertas personalizadas sobre KPIs críticos</li>
-              <li>Usa el Chat IA para consultas complejas sobre tus datos</li>
-              <li>Exporta datos y gráficos para informes externos</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold text-[#1B2731] mb-2">Para Usuarios Normales:</h4>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>Consulta los KPIs principales en el Dashboard</li>
-              <li>Visualiza gráficos simplificados de rendimiento</li>
-              <li>Usa las preguntas FAQ del Chat para consultas rápidas</li>
-              <li>Recibe notificaciones de alertas configuradas por tu admin</li>
-            </ul>
-          </div>
+    <div className="grid md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-xl border border-[#E8EEEE] p-6 text-center">
+        <div className="w-12 h-12 bg-[#E6F7F6] rounded-lg flex items-center justify-center mx-auto mb-4">
+          <Book className="w-6 h-6 text-[#33A19A]" />
         </div>
+        <h4 className="font-semibold text-[#1B2731] mb-2">Documentación</h4>
+        <p className="text-sm text-[#3E4C59] mb-4">
+          Guías completas de uso del sistema
+        </p>
+        <Button variant="outline" size="sm">
+          Ver Docs
+        </Button>
       </div>
 
-      {/* About */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-        <h3 className="text-lg font-semibold text-[#1B2731] mb-4">Sobre la Aplicación</h3>
-        
-        <div className="space-y-3 text-sm text-[#3E4C59]">
-          <div className="flex justify-between">
-            <span className="font-medium">Versión:</span>
-            <span>1.0.0 MVP</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-medium">Última actualización:</span>
-            <span>Marzo 2026</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="font-medium">Desarrollado por:</span>
-            <span className="font-semibold text-[#33A19A]">DATA GOAL</span>
-          </div>
+      <div className="bg-white rounded-xl border border-[#E8EEEE] p-6 text-center">
+        <div className="w-12 h-12 bg-[#E6F7F6] rounded-lg flex items-center justify-center mx-auto mb-4">
+          <Video className="w-6 h-6 text-[#33A19A]" />
         </div>
+        <h4 className="font-semibold text-[#1B2731] mb-2">Tutoriales</h4>
+        <p className="text-sm text-[#3E4C59] mb-4">
+          Videos paso a paso
+        </p>
+        <Button variant="outline" size="sm">
+          Ver Videos
+        </Button>
       </div>
 
-      {/* Resources */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-        <h3 className="text-lg font-semibold text-[#1B2731] mb-4">Recursos y Soporte</h3>
-        
-        <div className="space-y-3">
-          <Button variant="outline" className="w-full justify-start" asChild>
-            <a href="https://developers.holded.com/reference" target="_blank" rel="noopener">
-              <Book className="w-4 h-4 mr-2" />
-              Documentación API Holded
-              <ExternalLink className="w-3 h-3 ml-auto" />
-            </a>
-          </Button>
-
-          <Button variant="outline" className="w-full justify-start" asChild>
-            <a href="mailto:soporte@datagoal.es">
-              <Mail className="w-4 h-4 mr-2" />
-              Contactar Soporte DATA GOAL
-            </a>
-          </Button>
+      <div className="bg-white rounded-xl border border-[#E8EEEE] p-6 text-center">
+        <div className="w-12 h-12 bg-[#E6F7F6] rounded-lg flex items-center justify-center mx-auto mb-4">
+          <Mail className="w-6 h-6 text-[#33A19A]" />
         </div>
+        <h4 className="font-semibold text-[#1B2731] mb-2">Soporte</h4>
+        <p className="text-sm text-[#3E4C59] mb-4">
+          Contacta con el equipo
+        </p>
+        <Button variant="outline" size="sm">
+          Contactar
+        </Button>
       </div>
     </div>
   );

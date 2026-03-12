@@ -1,125 +1,104 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 
 const MODULES = [
-  { id: 'home', label: 'Dashboard Principal' },
-  { id: 'sales', label: 'Ventas' },
-  { id: 'purchases', label: 'Compras' },
-  { id: 'treasury', label: 'Tesorería' },
-  { id: 'taxes', label: 'Fiscalidad' },
-  { id: 'hr', label: 'RRHH' },
-  { id: 'products', label: 'Productos/ABC' },
-  { id: 'alerts', label: 'Alertas' },
-  { id: 'chat', label: 'Chat Inteligente' },
+  { id: 'home', name: 'Dirección General', always: true },
+  { id: 'sales', name: 'Ventas / Clientes', always: true },
+  { id: 'purchases', name: 'Compras / Proveedores', always: true },
+  { id: 'treasury', name: 'Tesorería', always: true },
+  { id: 'taxes', name: 'Fiscalidad', always: true },
+  { id: 'hr', name: 'RRHH', condition: ['servicios', 'mixto'] },
+  { id: 'products', name: 'Producto / ABC', condition: ['productos', 'mixto'] },
+  { id: 'stock', name: 'Stock / Inventario', condition: ['productos', 'mixto'] },
+  { id: 'capacity', name: 'Capacidad y Ocupación', condition: ['servicios', 'mixto'] },
+  { id: 'mrr', name: 'Recurrencia / MRR', condition: ['servicios', 'mixto'] },
+  { id: 'projects', name: 'Proyectos', condition: ['servicios', 'mixto'] },
+  { id: 'alerts', name: 'Alertas', always: true },
+  { id: 'chat', name: 'Chat Inteligente', always: true },
+  { id: 'settings', name: 'Configuración', adminOnly: true }
 ];
 
-const ROLES = ['admin', 'advanced', 'user'];
+export default function PermissionsSection({ modeloNegocio, onSave }) {
+  const [permissions, setPermissions] = useState({
+    admin: MODULES.map(m => m.id),
+    avanzado: MODULES.filter(m => !m.adminOnly).map(m => m.id),
+    user: ['home', 'sales', 'treasury', 'alerts']
+  });
 
-export default function PermissionsSection() {
-  const [permissions, setPermissions] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    loadPermissions();
-  }, []);
-
-  async function loadPermissions() {
-    setLoading(true);
-    try {
-      const configs = await base44.entities.SystemConfig.filter({ key: 'role_permissions' });
-      if (configs.length > 0) {
-        setPermissions(configs[0].value || {});
-      } else {
-        // Default permissions
-        const defaults = {};
-        MODULES.forEach(mod => {
-          defaults[mod.id] = { admin: true, advanced: true, user: true };
-        });
-        setPermissions(defaults);
-      }
-    } catch (error) {
-      console.error('Load permissions error:', error);
+  const visibleModules = MODULES.filter(module => {
+    if (module.always) return true;
+    if (module.adminOnly) return true;
+    if (module.condition) {
+      return module.condition.includes(modeloNegocio);
     }
-    setLoading(false);
+    return true;
+  });
+
+  function togglePermission(role, moduleId) {
+    const current = permissions[role] || [];
+    const newPermissions = current.includes(moduleId)
+      ? current.filter(id => id !== moduleId)
+      : [...current, moduleId];
+
+    setPermissions({
+      ...permissions,
+      [role]: newPermissions
+    });
   }
 
-  async function savePermissions() {
-    setSaving(true);
-    try {
-      const configs = await base44.entities.SystemConfig.filter({ key: 'role_permissions' });
-      if (configs.length > 0) {
-        await base44.entities.SystemConfig.update(configs[0].id, { value: permissions });
-      } else {
-        await base44.entities.SystemConfig.create({
-          key: 'role_permissions',
-          value: permissions,
-          category: 'permissions',
-          description: 'Module access permissions by role',
-        });
-      }
-    } catch (error) {
-      console.error('Save permissions error:', error);
-    }
-    setSaving(false);
+  function handleSave() {
+    onSave(permissions);
+    alert('✅ Permisos actualizados');
   }
-
-  function togglePermission(moduleId, role) {
-    setPermissions(prev => ({
-      ...prev,
-      [moduleId]: {
-        ...prev[moduleId],
-        [role]: !prev[moduleId]?.[role],
-      },
-    }));
-  }
-
-  if (loading) return <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-[#E8EEEE] p-6">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[#1B2731]">Permisos por Rol y Módulo</h3>
-          <p className="text-xs text-[#3E4C59] mt-1">Controla qué módulos puede ver cada rol</p>
-        </div>
-        <Button onClick={savePermissions} disabled={saving} className="bg-[#33A19A] hover:bg-[#2B8A84]">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar Cambios'}
-        </Button>
+    <div className="space-y-4">
+      <div className="bg-white rounded-xl border border-[#E8EEEE]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Módulo</TableHead>
+              <TableHead className="text-center">Admin</TableHead>
+              <TableHead className="text-center">Avanzado</TableHead>
+              <TableHead className="text-center">Normal</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visibleModules.map(module => (
+              <TableRow key={module.id}>
+                <TableCell className="font-medium">{module.name}</TableCell>
+                <TableCell className="text-center">
+                  <Checkbox
+                    checked={permissions.admin?.includes(module.id)}
+                    onCheckedChange={() => togglePermission('admin', module.id)}
+                    disabled={module.adminOnly}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <Checkbox
+                    checked={permissions.avanzado?.includes(module.id)}
+                    onCheckedChange={() => togglePermission('avanzado', module.id)}
+                    disabled={module.adminOnly}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <Checkbox
+                    checked={permissions.user?.includes(module.id)}
+                    onCheckedChange={() => togglePermission('user', module.id)}
+                    disabled={module.adminOnly}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-[#E8EEEE]">
-              <th className="text-left py-3 px-4 text-sm font-semibold text-[#1B2731]">Módulo</th>
-              {ROLES.map(role => (
-                <th key={role} className="text-center py-3 px-4 text-sm font-semibold text-[#1B2731]">
-                  {role === 'admin' ? 'Admin' : role === 'advanced' ? 'Avanzado' : 'Normal'}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {MODULES.map(module => (
-              <tr key={module.id} className="border-b border-[#E8EEEE] hover:bg-[#F8F6F1]">
-                <td className="py-3 px-4 text-sm text-[#3E4C59]">{module.label}</td>
-                {ROLES.map(role => (
-                  <td key={role} className="text-center py-3 px-4">
-                    <Checkbox
-                      checked={permissions[module.id]?.[role] || false}
-                      onCheckedChange={() => togglePermission(module.id, role)}
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Button onClick={handleSave}>
+        Aplicar Cambios
+      </Button>
     </div>
   );
 }
