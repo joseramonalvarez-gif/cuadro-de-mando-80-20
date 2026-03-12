@@ -45,11 +45,13 @@ function calculatePurchaseMetrics(invoices, contacts) {
 
 function calculateParetoData(invoices, contacts) {
   const supplierPurchases = {};
-  invoices.forEach(inv => {
-    const sid = inv.contactId || 'unknown';
-    if (!supplierPurchases[sid]) supplierPurchases[sid] = 0;
-    supplierPurchases[sid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
-  });
+  invoices
+    .filter(inv => inv.contactId) // Solo facturas con proveedor asignado
+    .forEach(inv => {
+      const sid = inv.contactId;
+      if (!supplierPurchases[sid]) supplierPurchases[sid] = 0;
+      supplierPurchases[sid] += convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange);
+    });
 
   const sorted = Object.entries(supplierPurchases)
     .map(([id, purchases]) => {

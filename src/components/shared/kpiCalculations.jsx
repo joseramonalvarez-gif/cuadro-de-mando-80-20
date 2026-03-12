@@ -223,18 +223,23 @@ export function calcularPrevisionTesoreria(facturas, saldoActual, diasPrevision 
     fechaFin.setDate(fechaFin.getDate() + 7);
     
     const facturasRango = facturas.filter(f => {
-      if (!f.fechaVencimiento || f.estadoPago === 'paid') return false;
-      const vto = new Date(f.fechaVencimiento * 1000);
-      return vto >= fechaInicio && vto < fechaFin;
+      const status = f.estadoPago || f.status;
+      if (status === 'paid') return false;
+      
+      const vto = f.fechaVencimiento 
+        ? new Date(f.fechaVencimiento * 1000) 
+        : (f.dueDate ? new Date(f.dueDate * 1000) : null);
+      
+      return vto && vto >= fechaInicio && vto < fechaFin;
     });
     
     const entradas = facturasRango
       .filter(f => f.tipo === 'invoice')
-      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || 0, f.moneda, f.tipoCambio), 0);
+      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || f.total || 0, f.moneda || f.currency, f.tipoCambio || f.currencyChange), 0);
     
     const salidas = facturasRango
       .filter(f => f.tipo === 'purchase')
-      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || 0, f.moneda, f.tipoCambio), 0);
+      .reduce((sum, f) => sum + convertirAEUR(f.importeNeto || f.total || 0, f.moneda || f.currency, f.tipoCambio || f.currencyChange), 0);
     
     saldoActual = saldoActual + entradas - salidas;
     

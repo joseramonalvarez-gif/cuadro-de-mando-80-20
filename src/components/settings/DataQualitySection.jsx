@@ -1,8 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../shared/DemoContext';
+import { base44 } from '@/api/base44Client';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { calcularCalidadDato } from '../shared/kpiCalculations';
 
-export default function DataQualitySection({ modeloNegocio, quality }) {
+export default function DataQualitySection({ modeloNegocio }) {
+  const { activeCompany } = useApp();
+  const [quality, setQuality] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    if (activeCompany) {
+      loadQualityScore();
+    }
+  }, [activeCompany]);
+  
+  async function loadQualityScore() {
+    setLoading(true);
+    try {
+      const [invoices, lineas, productos] = await Promise.all([
+        base44.entities.CachedData.filter({ company_id: activeCompany.id, data_type: 'invoices_sale' }),
+        base44.entities.LineasVenta.filter({ company_id: activeCompany.id }),
+        base44.entities.Productos.filter({ company_id: activeCompany.id })
+      ]);
+      
+      const facturasData = invoices[0]?.data?.items || [];
+      const score = calcularCalidadDato(facturasData, lineas, productos);
+      setQuality(score);
+    } catch (error) {
+      console.error('Error calculando calidad:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="w-6 h-6 animate-spin text-[#33A19A]" />
+      </div>
+    );
+  }
   const getScoreColor = (score) => {
     if (score >= 85) return 'text-[#33A19A]';
     if (score >= 70) return 'text-[#E6A817]';
@@ -21,22 +61,32 @@ export default function DataQualitySection({ modeloNegocio, quality }) {
     return 'bg-[#E05252]';
   };
 
-  // Datos de ejemplo
-  const qualityMetrics = modeloNegocio === 'servicios' || modeloNegocio === 'mixto' ? [
-    { name: 'Perfiles de coste configurados', score: 30, weight: 30, impact: 'Margen real, Ocupación' },
-    { name: 'Horas con billable asignado', score: 85, weight: 25, impact: 'Productividad, Margen/hora' },
-    { name: 'Facturas vinculadas a proyecto', score: 70, weight: 20, impact: 'Desviación proyectos' },
-    { name: 'Contactos con tipo asignado', score: 92, weight: 15, impact: 'Segmentación clientes' },
-    { name: 'Contratos recurrentes identificados', score: 45, weight: 10, impact: 'MRR, Churn' }
-  ] : [
-    { name: 'Facturas con productoId', score: 88, weight: 30, impact: 'ABC Productos, Mix' },
-    { name: 'Productos con coste en Holded', score: 65, weight: 30, impact: 'Margen real' },
-    { name: 'Contactos con ciudad/país', score: 78, weight: 15, impact: 'Análisis geográfico' },
-    { name: 'Facturas con canal de venta', score: 55, weight: 15, impact: 'Mix canal' },
-    { name: 'Referencias con stock', score: 92, weight: 10, impact: 'Rotación, Ruptura' }
-  ];
+  // Calcular métricas reales
+  const qualityMetrics = quality ? [
+    { 
+      name: 'Facturas con contacto asignado', 
+      score: quality.scoreContacto, 
+      weight: 35, 
+      impact: 'ABC Clientes, RFM',
+      detalles: `${quality.detalles.facturasConContacto} de ${quality.detalles.totalFacturas} facturas`
+    },
+    { 
+      name: 'Líneas con producto asignado', 
+      score: quality.scoreProducto, 
+      weight: 30, 
+      impact: 'ABC Productos, Mix',
+      detalles: `${quality.detalles.lineasConProducto} de ${quality.detalles.totalLineas} líneas`
+    },
+    { 
+      name: 'Productos con coste definido', 
+      score: quality.scoreCoste, 
+      weight: 35, 
+      impact: 'Margen bruto real',
+      detalles: `${quality.detalles.productosConCoste} de ${quality.detalles.totalProductos} productos`
+    }
+  ] : [];
 
-  const globalScore = qualityMetrics.reduce((sum, m) => sum + (m.score * m.weight / 100), 0);
+  const globalScore = quality?.scoreGlobal || 0;
 
   return (
     <div className="space-y-6">
@@ -44,15 +94,26 @@ export default function DataQualitySection({ modeloNegocio, quality }) {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-[#1B2731] font-['Space_Grotesk']">
-              Score Global de Calidad
+              Score Global de Calidad de Dato
             </h3>
             <p className="text-sm text-[#3E4C59] mt-1">
-              Basado en completitud de datos en Holded
+              Calculado desde tus datos reales de Holded
             </p>
           </div>
-          <div className="text-right">
-            <div className={`text-4xl font-bold ${getScoreColor(globalScore)} font-['Space_Grotesk']`}>
-              {getScoreIcon(globalScore)} {Math.round(globalScore)}%
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={loadQualityScore}
+              className="h-8 text-xs"
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+              Recalcular
+            </Button>
+            <div className="text-right">
+              <div className={`text-4xl font-bold ${getScoreColor(globalScore)} font-['Space_Grotesk']`}>
+                {getScoreIcon(globalScore)} {Math.round(globalScore)}%
+              </div>
             </div>
           </div>
         </div>
@@ -62,11 +123,11 @@ export default function DataQualitySection({ modeloNegocio, quality }) {
             <div key={idx} className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="font-medium text-[#1B2731]">{metric.name}</span>
-                <span className={getScoreColor(metric.score)}>{metric.score}%</span>
+                <span className={getScoreColor(metric.score)}>{Math.round(metric.score)}%</span>
               </div>
               <Progress value={metric.score} className="h-2" />
               <div className="flex justify-between text-xs text-[#B7CAC9]">
-                <span>Peso: {metric.weight}%</span>
+                <span>{metric.detalles}</span>
                 <span>Afecta a: {metric.impact}</span>
               </div>
               {metric.score < 80 && (

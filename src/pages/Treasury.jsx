@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowDownCircle, ArrowUpCircle, TrendingUp, Clock, Activity } from 'lucide-react';
 import { toast } from 'sonner';
-import { filtrarPorFechas, convertirAEUR, calcularAging } from '@/components/shared/kpiCalculations';
+import { filtrarPorFechas, convertirAEUR, calcularAging, calcularPrevisionTesoreria } from '@/components/shared/kpiCalculations';
 
 function calculateTreasuryMetrics(treasuries, payments, invoicesSale, invoicesPurchase) {
   const totalBalance = treasuries.reduce((sum, t) => sum + (t.balance || 0), 0);
@@ -46,23 +46,55 @@ function calculateTreasuryMetrics(treasuries, payments, invoicesSale, invoicesPu
 
 function generateForecastData(period, currentBalance, invoicesSale, invoicesPurchase) {
   const data = [];
-  const now = new Date();
-  let saldo = currentBalance;
-
-  for (let i = 0; i <= period; i += Math.ceil(period / 10)) {
-    const date = new Date(now);
-    date.setDate(date.getDate() + i);
-    const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
-
-    const entradas = Math.random() * 15000 + 8000;
-    const salidas = Math.random() * 12000 + 6000;
-    saldo += (entradas - salidas);
-
+  const hoy = new Date();
+  let saldoProyectado = currentBalance;
+  
+  // Si no hay datos reales, usar simulación
+  if (!invoicesSale.length && !invoicesPurchase.length) {
+    for (let i = 0; i <= period; i += Math.ceil(period / 10)) {
+      const date = new Date(hoy);
+      date.setDate(date.getDate() + i);
+      const dateStr = `${date.getDate()}/${date.getMonth() + 1}`;
+      const entradas = Math.random() * 15000 + 8000;
+      const salidas = Math.random() * 12000 + 6000;
+      saldoProyectado += (entradas - salidas);
+      data.push({ date: dateStr, entradas, salidas, saldo: saldoProyectado });
+    }
+    return data;
+  }
+  
+  // Cálculo real basado en vencimientos
+  for (let dia = 0; dia <= period; dia += 7) {
+    const fechaInicio = new Date(hoy);
+    fechaInicio.setDate(fechaInicio.getDate() + dia);
+    const fechaFin = new Date(fechaInicio);
+    fechaFin.setDate(fechaFin.getDate() + 7);
+    
+    // Facturas de venta que vencen en este período
+    const entradasPrevistas = invoicesSale
+      .filter(inv => {
+        if (inv.status === 'paid') return false;
+        const dueDate = inv.dueDate ? new Date(inv.dueDate * 1000) : null;
+        return dueDate && dueDate >= fechaInicio && dueDate < fechaFin;
+      })
+      .reduce((sum, inv) => sum + convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange), 0);
+    
+    // Facturas de compra que vencen en este período
+    const salidasPrevistas = invoicesPurchase
+      .filter(inv => {
+        if (inv.status === 'paid') return false;
+        const dueDate = inv.dueDate ? new Date(inv.dueDate * 1000) : null;
+        return dueDate && dueDate >= fechaInicio && dueDate < fechaFin;
+      })
+      .reduce((sum, inv) => sum + convertirAEUR(inv.total || 0, inv.currency, inv.currencyChange), 0);
+    
+    saldoProyectado = saldoProyectado + entradasPrevistas - salidasPrevistas;
+    
     data.push({
-      date: dateStr,
-      entradas: entradas,
-      salidas: salidas,
-      saldo: saldo,
+      date: `${fechaInicio.getDate()}/${fechaInicio.getMonth() + 1}`,
+      entradas: entradasPrevistas,
+      salidas: salidasPrevistas,
+      saldo: saldoProyectado
     });
   }
 
@@ -201,7 +233,14 @@ export default function Treasury() {
     if (isDemo) {
       return generateForecastData(period, 160280, [], []);
     }
-    return generateForecastData(period, metrics.saldo_total.value, realInvoicesSale, realInvoicesPurchase);
+    
+    // Combinar facturas para previsión
+    const todasFacturas = [
+      ...realInvoicesSale.map(inv => ({ ...inv, tipo: 'invoice' })),
+      ...realInvoicesPurchase.map(inv => ({ ...inv, tipo: 'purchase' }))
+    ];
+    
+    return calcularPrevisionTesoreria(todasFacturas, metrics.saldo_total.value, period);
   }, [filters.forecastPeriod, isDemo, metrics, realInvoicesSale, realInvoicesPurchase]);
 
   const agingClientesData = useMemo(() => {
