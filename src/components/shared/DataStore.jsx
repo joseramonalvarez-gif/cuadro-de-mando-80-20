@@ -37,11 +37,20 @@ export function DataStoreProvider({ children, companyId }) {
           company_id: companyId,
           data_type: type,
         });
-        if (cached.length > 0 && cached[0].data?.items) {
-          loaded[type] = cached[0].data.items;
-          if (!lastSync || new Date(cached[0].last_fetched) > new Date(lastSync)) {
-            setLastSync(cached[0].last_fetched);
+        
+        // Merge all chunks for this data type
+        let allItems = [];
+        for (const chunk of cached) {
+          if (chunk.data?.items) {
+            allItems = [...allItems, ...chunk.data.items];
+            if (!lastSync || new Date(chunk.last_fetched) > new Date(lastSync)) {
+              setLastSync(chunk.last_fetched);
+            }
           }
+        }
+        
+        if (allItems.length > 0) {
+          loaded[type] = allItems;
         }
       }
       
