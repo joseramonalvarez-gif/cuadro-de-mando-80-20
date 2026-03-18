@@ -141,23 +141,26 @@ Deno.serve(async (req) => {
         const data = await fetchHoldedAllPages(apiKey, ep.path);
         const elapsed = Date.now() - epStart;
 
-        // Cache the data
+        // Delete old cached data for this type
         const existing = await base44.asServiceRole.entities.CachedData.filter({
           company_id: finalCompanyId,
           data_type: ep.type,
         });
+        
+        for (const old of existing) {
+          await base44.asServiceRole.entities.CachedData.delete(old.id);
+        }
 
-        if (existing.length > 0) {
-          await base44.asServiceRole.entities.CachedData.update(existing[0].id, {
-            data: { items: Array.isArray(data) ? data : [data] },
-            last_fetched: new Date().toISOString(),
-            last_timestamp: now,
-          });
-        } else {
+        // Split data into chunks of max 500 items to avoid BSON size limit
+        const dataArray = Array.isArray(data) ? data : [data];
+        const CHUNK_SIZE = 500;
+        
+        for (let i = 0; i < dataArray.length; i += CHUNK_SIZE) {
+          const chunk = dataArray.slice(i, i + CHUNK_SIZE);
           await base44.asServiceRole.entities.CachedData.create({
             company_id: finalCompanyId,
             data_type: ep.type,
-            data: { items: Array.isArray(data) ? data : [data] },
+            data: { items: chunk, chunk_index: Math.floor(i / CHUNK_SIZE), total_chunks: Math.ceil(dataArray.length / CHUNK_SIZE) },
             last_fetched: new Date().toISOString(),
             last_timestamp: now,
           });
