@@ -1,0 +1,52 @@
+{
+  "name": "AlertLog",
+  "type": "object",
+  "properties": {
+    "alert_id": {
+      "type": "string",
+      "description": "Reference to Alert"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "kpi_name": {
+      "type": "string"
+    },
+    "kpi_label": {
+      "type": "string"
+    },
+    "triggered_value": {
+      "type": "number",
+      "description": "Value at trigger time"
+    },
+    "threshold": {
+      "type": "number"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "red"
+      ]
+    },
+    "notified_users": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "read_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Users who marked as read"
+    }
+  },
+  "required": [
+    "alert_id",
+    "company_id",
+    "kpi_name"
+  ]
+}

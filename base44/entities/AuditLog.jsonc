@@ -1,0 +1,48 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "User who performed the action"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "login",
+        "logout",
+        "config_change",
+        "data_export",
+        "etl_refresh",
+        "alert_change",
+        "user_create",
+        "user_update",
+        "user_delete",
+        "company_create",
+        "company_update",
+        "role_permission_change"
+      ],
+      "description": "Type of action performed"
+    },
+    "module": {
+      "type": "string",
+      "description": "Affected module"
+    },
+    "details": {
+      "type": "object",
+      "description": "Additional details about the action"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "IP address of the user"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "Affected company if applicable"
+    }
+  },
+  "required": [
+    "user_email",
+    "action"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "Empleados",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "empleadoId": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "perfil": {
+      "type": "string"
+    },
+    "costeHora": {
+      "type": "number"
+    },
+    "horasJornada": {
+      "type": "number",
+      "default": 8
+    }
+  },
+  "required": [
+    "company_id",
+    "empleadoId",
+    "nombre"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "avanzado",
+        "normal"
+      ],
+      "default": "normal",
+      "description": "User role"
+    }
+  },
+  "required": []
+}

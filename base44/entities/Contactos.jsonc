@@ -1,0 +1,54 @@
+{
+  "name": "Contactos",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "contactId": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "esCliente": {
+      "type": "boolean"
+    },
+    "esProveedor": {
+      "type": "boolean"
+    },
+    "ciudad": {
+      "type": "string"
+    },
+    "pais": {
+      "type": "string"
+    },
+    "grupo": {
+      "type": "string"
+    },
+    "totalVentas": {
+      "type": "number",
+      "default": 0
+    },
+    "totalCompras": {
+      "type": "number",
+      "default": 0
+    },
+    "numeroFacturas": {
+      "type": "number",
+      "default": 0
+    },
+    "ultimaCompra": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "diasSinComprar": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "company_id",
+    "contactId",
+    "nombre"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "CachedData",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "data_type": {
+      "type": "string",
+      "enum": [
+        "invoices_sale",
+        "invoices_purchase",
+        "creditnotes",
+        "contacts",
+        "treasuries",
+        "payments",
+        "products",
+        "taxes",
+        "employees",
+        "times",
+        "ledger",
+        "accounts"
+      ],
+      "description": "Type of cached data"
+    },
+    "data": {
+      "type": "object",
+      "description": "Cached response data"
+    },
+    "last_fetched": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_timestamp": {
+      "type": "number",
+      "description": "Last Unix timestamp processed for incremental fetch"
+    }
+  },
+  "required": [
+    "company_id",
+    "data_type"
+  ]
+}

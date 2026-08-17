@@ -1,0 +1,37 @@
+{
+  "name": "Proyectos",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "proyectoId": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "clienteId": {
+      "type": "string"
+    },
+    "estado": {
+      "type": "string"
+    },
+    "fechaInicio": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fechaFin": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "presupuesto": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "company_id",
+    "proyectoId",
+    "nombre"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "name": "Company",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Company name"
+    },
+    "holded_api_key": {
+      "type": "string",
+      "description": "Encrypted Holded API key"
+    },
+    "modelo_negocio": {
+      "type": "string",
+      "enum": [
+        "productos",
+        "servicios",
+        "mixto"
+      ],
+      "default": "mixto",
+      "description": "Business model type"
+    },
+    "last_sync_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last data sync timestamp"
+    },
+    "ultima_fecha_procesada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last processed date for incremental ETL"
+    },
+    "is_demo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether company is in demo mode"
+    },
+    "allowed_users": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of user emails with access"
+    },
+    "config_empleados": {
+      "type": "object",
+      "description": "Employee configuration (cost per hour, hours per day)",
+      "properties": {
+        "horas_jornada": {
+          "type": "number",
+          "default": 8
+        },
+        "costes_hora": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

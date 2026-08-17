@@ -1,0 +1,35 @@
+{
+  "name": "HorasRegistradas",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "timeId": {
+      "type": "string"
+    },
+    "empleadoId": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "horas": {
+      "type": "number"
+    },
+    "proyectoId": {
+      "type": "string"
+    },
+    "facturable": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "company_id",
+    "timeId",
+    "empleadoId",
+    "fecha",
+    "horas"
+  ]
+}

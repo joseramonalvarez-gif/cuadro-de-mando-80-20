@@ -1,0 +1,138 @@
+{
+  "name": "LineasVenta",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "facturaId": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "a\u00f1o": {
+      "type": "number"
+    },
+    "mes": {
+      "type": "number"
+    },
+    "trimestre": {
+      "type": "number"
+    },
+    "clienteId": {
+      "type": "string"
+    },
+    "estadoPago": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "sent",
+        "paid",
+        "overdue",
+        "partial"
+      ]
+    },
+    "fechaVencimiento": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "canalVentaId": {
+      "type": "string"
+    },
+    "esDevolucion": {
+      "type": "boolean",
+      "default": false
+    },
+    "moneda": {
+      "type": "string",
+      "default": "EUR"
+    },
+    "tipoCambio": {
+      "type": "number",
+      "default": 1
+    },
+    "itemId": {
+      "type": "string"
+    },
+    "itemNombre": {
+      "type": "string"
+    },
+    "unidades": {
+      "type": "number"
+    },
+    "precioUnitario": {
+      "type": "number"
+    },
+    "descuentoPct": {
+      "type": "number",
+      "default": 0
+    },
+    "importeBruto": {
+      "type": "number"
+    },
+    "importeNeto": {
+      "type": "number"
+    },
+    "impuestoId": {
+      "type": "string"
+    },
+    "subtotal": {
+      "type": "number"
+    },
+    "familia": {
+      "type": "string"
+    },
+    "categoria": {
+      "type": "string"
+    },
+    "costeUnitario": {
+      "type": "number"
+    },
+    "pvpCatalogo": {
+      "type": "number"
+    },
+    "importeNetoEUR": {
+      "type": "number"
+    },
+    "costeTotal": {
+      "type": "number"
+    },
+    "margenBruto": {
+      "type": "number"
+    },
+    "margenPct": {
+      "type": "number"
+    },
+    "diasHastaVto": {
+      "type": "number"
+    },
+    "estaVencida": {
+      "type": "boolean"
+    },
+    "diasVencida": {
+      "type": "number"
+    },
+    "esServicio": {
+      "type": "boolean"
+    },
+    "tipoServicio": {
+      "type": "string"
+    },
+    "esRecurrente": {
+      "type": "boolean"
+    },
+    "horasEstimadas": {
+      "type": "number"
+    },
+    "tarifaHora": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "company_id",
+    "facturaId",
+    "fecha"
+  ]
+}

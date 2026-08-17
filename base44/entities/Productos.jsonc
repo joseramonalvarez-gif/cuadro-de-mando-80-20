@@ -1,0 +1,45 @@
+{
+  "name": "Productos",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "productoId": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "pvp": {
+      "type": "number"
+    },
+    "coste": {
+      "type": "number"
+    },
+    "familia": {
+      "type": "string"
+    },
+    "categoria": {
+      "type": "string"
+    },
+    "unidadMedida": {
+      "type": "string"
+    },
+    "stockActual": {
+      "type": "number"
+    },
+    "stockMinimo": {
+      "type": "number"
+    },
+    "esServicio": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "company_id",
+    "productoId",
+    "nombre"
+  ]
+}

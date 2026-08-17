@@ -1,0 +1,38 @@
+{
+  "name": "ApiLog",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "endpoint": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    "status_code": {
+      "type": "number"
+    },
+    "response_time_ms": {
+      "type": "number"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "records_fetched": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "company_id",
+    "endpoint",
+    "method"
+  ]
+}

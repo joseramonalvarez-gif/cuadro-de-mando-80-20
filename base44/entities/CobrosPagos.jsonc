@@ -1,0 +1,41 @@
+{
+  "name": "CobrosPagos",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "pagoId": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "cobro",
+        "pago"
+      ]
+    },
+    "importe": {
+      "type": "number"
+    },
+    "contactoId": {
+      "type": "string"
+    },
+    "docId": {
+      "type": "string"
+    },
+    "cuentaTesoreriaId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "pagoId",
+    "fecha",
+    "tipo"
+  ]
+}

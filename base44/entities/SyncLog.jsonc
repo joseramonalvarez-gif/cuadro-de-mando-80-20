@@ -1,0 +1,39 @@
+{
+  "name": "SyncLog",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "endpoint": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error",
+        "partial"
+      ]
+    },
+    "records_count": {
+      "type": "number"
+    },
+    "duration_ms": {
+      "type": "number"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "endpoint",
+    "timestamp",
+    "status"
+  ]
+}

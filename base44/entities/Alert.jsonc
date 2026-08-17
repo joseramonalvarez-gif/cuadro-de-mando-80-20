@@ -1,0 +1,110 @@
+{
+  "name": "Alert",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "Company this alert belongs to"
+    },
+    "kpi_name": {
+      "type": "string",
+      "description": "KPI identifier (e.g. dso, cash_balance, margen_bruto)"
+    },
+    "kpi_label": {
+      "type": "string",
+      "description": "KPI display name"
+    },
+    "module": {
+      "type": "string",
+      "description": "Module name (ventas, compras, tesoreria, etc.)"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "greater_than",
+        "less_than",
+        "equals"
+      ],
+      "description": "Alert trigger condition"
+    },
+    "threshold": {
+      "type": "number",
+      "description": "Threshold value"
+    },
+    "period": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "quarterly"
+      ],
+      "default": "daily",
+      "description": "Evaluation period"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "yellow",
+        "red"
+      ],
+      "default": "yellow",
+      "description": "Alert severity level"
+    },
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "email",
+          "push"
+        ]
+      },
+      "default": [
+        "push"
+      ],
+      "description": "Notification channels"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "triggered"
+      ],
+      "default": "active",
+      "description": "Alert status"
+    },
+    "is_system": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is a system default alert"
+    },
+    "last_triggered": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time alert was triggered"
+    },
+    "last_value": {
+      "type": "number",
+      "description": "Last metric value when triggered"
+    },
+    "previous_status": {
+      "type": "string",
+      "description": "Previous status for anti-spam logic"
+    },
+    "assigned_users": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User emails to notify"
+    }
+  },
+  "required": [
+    "company_id",
+    "kpi_name",
+    "condition",
+    "threshold"
+  ]
+}

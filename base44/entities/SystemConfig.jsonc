@@ -1,0 +1,33 @@
+{
+  "name": "SystemConfig",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Configuration key"
+    },
+    "value": {
+      "type": "object",
+      "description": "Configuration value (flexible JSON)"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "general",
+        "ai",
+        "notifications",
+        "permissions"
+      ],
+      "description": "Configuration category"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description"
+    }
+  },
+  "required": [
+    "key",
+    "value",
+    "category"
+  ]
+}

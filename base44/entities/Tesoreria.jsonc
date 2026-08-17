@@ -1,0 +1,27 @@
+{
+  "name": "Tesoreria",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "cuentaId": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "saldo": {
+      "type": "number"
+    },
+    "moneda": {
+      "type": "string",
+      "default": "EUR"
+    }
+  },
+  "required": [
+    "company_id",
+    "cuentaId",
+    "nombre"
+  ]
+}
